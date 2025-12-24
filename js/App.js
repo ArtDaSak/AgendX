@@ -588,23 +588,27 @@ function startTimerTick(session) {
 
     if (!mainEl || !remainEl || !subEl) return;
 
-    if (!current) {
-      mainEl.textContent = "Sin rango actual";
-      remainEl.textContent = "";
-      subEl.textContent = "";
-      return;
-    }
+if (!current) {
+  mainEl.textContent = "Sin rango actual";
+  remainEl.textContent = "";
+  subEl.textContent = "";
+  const timerLine = document.getElementById("TimerLine");
+  if (timerLine) timerLine.classList.remove("isRunning");
+  return;
+}
 
     const schedule = buildSchedule(session);
     const item = schedule.find(x => x.occurrenceId === current.occurrenceId);
 
     mainEl.textContent = `R${current.rangeOrder} · ${current.title}`;
 
-    if (!item || item.durationSec <= 0) {
-      remainEl.textContent = "Sin duración";
-      subEl.textContent = "Define minutos para ver el temporizador en tiempo real";
-      return;
-    }
+if (!item || item.durationSec <= 0) {
+  remainEl.textContent = "Sin duración";
+  subEl.textContent = "Define minutos para ver el temporizador en tiempo real";
+  const timerLine = document.getElementById("TimerLine");
+  if (timerLine) timerLine.classList.remove("isRunning");
+  return;
+}
 
     const now = Date.now();
     const endMs = item.endMs;
@@ -619,10 +623,17 @@ function startTimerTick(session) {
       .filter(x => !session.doneByOccId[x.occurrenceId])
       .reduce((acc, x) => acc + Math.max(0, x.endMs - Math.max(now, x.startMs)), 0);
 
-    subEl.textContent =
-      `Transcurrido ${DateUtils.formatHMS(elapsedSec)} · Faltan ${DateUtils.formatHMS(remainSec)} para concluir` +
-      ` · Restante total (estimado): ${DateUtils.formatHMS(Math.floor(pendingRemainMs / 1000))}`;
-  };
+const timerLine = document.getElementById("TimerLine");
+
+subEl.innerHTML = `
+  <div>Transcurrido ${DateUtils.formatHMS(elapsedSec)}</div>
+  <div>Faltan ${DateUtils.formatHMS(remainSec)} para concluir</div>
+  <div>Restante total (estimado): ${DateUtils.formatHMS(Math.floor(pendingRemainMs / 1000))}</div>
+`;
+
+// Marca visual de “temporizador activo”
+if (timerLine) timerLine.classList.add("isRunning");
+
 
   tick();
   timerTickId = setInterval(tick, 1000);
@@ -652,6 +663,69 @@ function buildSchedule(session) {
     cursorMs = item.endMs;
   }
   return schedule;
+}
+
+async function recalculateActiveDayIfNeeded() {
+  const session = AppState.data.activeDaySession;
+  if (!session?.remoteId) return;
+
+  const todayKey = DateUtils.toLocalDateKey(new Date());
+  if (session.dayKey !== todayKey) return;
+
+  // Se reconstruye el plan (incluye regla de descansos)
+  const newPlan = buildDayPlan(todayKey);
+
+  // Si al recalcular no queda nada, se termina la sesión
+  if (!newPlan || newPlan.length === 0) {
+    // Se detiene cualquier patch pendiente
+    pendingRecPatch = null;
+    clearTimeout(pendingRecPatchTimer);
+
+    await safeDeleteRecurrence(session.remoteId);
+    AppState.data.activeDaySession = null;
+    showToastLikeNotice("El día activo se cerró porque ya no hay rangos para hoy.");
+    return;
+  }
+
+  // Se preserva el progreso existente por occurrenceId
+  const oldDone = session.doneByOccId ?? {};
+  const newDoneByOccId = Object.fromEntries(
+    newPlan.map(o => [o.occurrenceId, Boolean(oldDone[o.occurrenceId])])
+  );
+
+  // Se intenta mantener el rango actual si sigue existiendo
+  const oldCurrentOccId = session.plan?.[session.currentIndex]?.occurrenceId ?? null;
+  let newIndex = oldCurrentOccId
+    ? newPlan.findIndex(o => o.occurrenceId === oldCurrentOccId)
+    : 0;
+
+  if (newIndex < 0) newIndex = 0;
+
+  // Se actualiza sesión local
+  session.plan = newPlan;
+  session.planCount = newPlan.length;
+  session.doneByOccId = newDoneByOccId;
+  session.currentIndex = newIndex;
+
+  // Asegura que currentIndex caiga sobre un pendiente si es posible
+  getCurrentOccurrence(session);
+
+  // Se detiene patch pendiente y se sincroniza “ya”
+  pendingRecPatch = null;
+  clearTimeout(pendingRecPatchTimer);
+
+  try {
+    await Api.patchRecurrence(session.remoteId, {
+      plan: session.plan,
+      doneByOccId: session.doneByOccId,
+      currentIndex: session.currentIndex,
+      keepUntil: endOfDayIso(session.dayKey),
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error(err);
+    showToastLikeNotice("No se pudo recalcular el plan del día en MockAPI.");
+  }
 }
 
 /* -------------------------
@@ -772,6 +846,7 @@ async function onSubmitEvent(e) {
       if (idx >= 0) AppState.data.events[idx] = updated;
     }
 
+    await recalculateActiveDayIfNeeded();
     closeEventSheet();
   } catch (err) {
     console.error(err);
@@ -792,6 +867,7 @@ async function onDeleteEvent() {
   try {
     await Api.deleteEvent(id);
     AppState.data.events = AppState.data.events.filter(e => e.id !== id);
+    await recalculateActiveDayIfNeeded();
     closeEventSheet();
   } catch (err) {
     console.error(err);
@@ -1021,4 +1097,5 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
 }

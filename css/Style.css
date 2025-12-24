@@ -419,3 +419,19 @@ textarea{ resize: none; }
 .HintBox small{
   color: rgba(235,235,255,.72);
 }
+
+.TimerLine .SubLine div{
+  margin-top: 4px;
+}
+
+.TimerLine.isRunning .MainLine span{
+  color: rgba(235, 235, 255, 0.86);
+}
+
+.TimerLine.isRunning #TimerRemain{
+  color: rgba(10, 189, 198, 0.78); /* strong-cyan suave */
+}
+
+.TimerLine.isRunning .SubLine{
+  color: rgba(235, 235, 255, 0.68);
+}
