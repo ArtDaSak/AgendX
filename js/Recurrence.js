@@ -44,7 +44,7 @@ export const Recurrence = {
   matches(event, dayKey) {
     const weekdayFilter = Array.isArray(event.weekdayFilter) ? event.weekdayFilter : [];
     if (weekdayFilter.length > 0) {
-      const weekday = DateUtils.fromLocalDateKey(dayKey).getDay(); // 0 dom - 6 sáb
+      const weekday = DateUtils.fromLocalDateKey(dayKey).getDay();
       if (!weekdayFilter.includes(weekday)) return false;
     }
 

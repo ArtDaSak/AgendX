@@ -6,7 +6,6 @@
   <meta name="theme-color" content="#091833" />
   <title>AgendX</title>
 
-  <!-- Fuente para títulos -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Iceland&display=swap" rel="stylesheet">
@@ -24,9 +23,7 @@
       </div>
     </div>
 
-    <button class="PrimaryBtn" id="OpenCreateBtn" type="button">
-      + Agregar
-    </button>
+    <button class="PrimaryBtn" id="OpenCreateBtn" type="button">+ Agregar</button>
   </header>
 
   <main class="Main">
@@ -54,10 +51,8 @@
     </section>
   </main>
 
-  <!-- Modal Overlay -->
   <div class="Overlay" id="Overlay" hidden></div>
 
-  <!-- Bottom Sheet: Agregar Evento / Descanso -->
   <section class="Sheet" id="EventSheet" hidden aria-modal="true" role="dialog" aria-labelledby="EventSheetTitle">
     <header class="SheetHeader">
       <h3 id="EventSheetTitle">Agregar evento</h3>
@@ -125,7 +120,7 @@
 
       <div class="HintBox">
         <strong>Regla de Descanso</strong>
-        <small>Si en un día existe un evento NO diario en el mismo rango, el “Descanso” de ese rango se elimina automáticamente.</small>
+        <small>Si existe un evento NO diario en el mismo rango, el “Descanso” de ese rango se elimina automáticamente para ese día.</small>
       </div>
 
       <div class="SheetFooter">

@@ -1,5 +1,4 @@
 :root{
-  /* CSS HEX */
   --lavender: #ebebff;
   --velvet-orchid: #711c91;
   --vivid-orchid: #ea00d9;
@@ -74,15 +73,8 @@ h1,h2,h3{
   flex: 0 0 auto;
 }
 
-.BrandText h1{
-  font-size: 18px;
-  margin: 0;
-}
-.BrandText p{
-  font-size: 12px;
-  margin: 2px 0 0 0;
-  color: var(--muted);
-}
+.BrandText h1{ font-size: 18px; margin: 0; }
+.BrandText p{ font-size: 12px; margin: 2px 0 0 0; color: var(--muted); }
 
 .Main{
   max-width: var(--max);
@@ -125,10 +117,7 @@ h1,h2,h3{
   gap: 10px;
   border-bottom: 1px solid var(--stroke);
 }
-.CardHeader h2{
-  margin: 0;
-  font-size: 16px;
-}
+.CardHeader h2{ margin: 0; font-size: 16px; }
 .InlineControls{
   display: flex;
   gap: 8px;
@@ -151,14 +140,8 @@ h1,h2,h3{
   display: grid;
   gap: 8px;
 }
-.RowTop{
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-.TitleLine{
-  min-width: 0;
-}
+.RowTop{ display: flex; justify-content: space-between; gap: 10px; }
+.TitleLine{ min-width: 0; }
 .TitleLine strong{
   display: block;
   font-size: 14px;
@@ -166,16 +149,9 @@ h1,h2,h3{
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.TitleLine small{
-  color: var(--muted);
-  font-size: 12px;
-}
-.Badges{
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
+.TitleLine small{ color: var(--muted); font-size: 12px; }
+
+.Badges{ display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .Badge{
   font-size: 11px;
   padding: 4px 8px;
@@ -184,34 +160,14 @@ h1,h2,h3{
   color: var(--text);
   background: rgba(19,62,124,.18);
 }
-.Badge.isAccent{
-  border-color: rgba(234,0,217,.30);
-  background: rgba(234,0,217,.12);
-}
-.Badge.isCyan{
-  border-color: rgba(10,189,198,.30);
-  background: rgba(10,189,198,.12);
-}
-.Badge.isWarn{
-  border-color: rgba(235,235,255,.30);
-  background: rgba(235,235,255,.10);
-}
-.Badge.isDone{
-  border-color: rgba(10,189,198,.40);
-  background: rgba(10,189,198,.18);
-}
+.Badge.isAccent{ border-color: rgba(234,0,217,.30); background: rgba(234,0,217,.12); }
+.Badge.isCyan{ border-color: rgba(10,189,198,.30); background: rgba(10,189,198,.12); }
+.Badge.isWarn{ border-color: rgba(235,235,255,.30); background: rgba(235,235,255,.10); }
+.Badge.isDone{ border-color: rgba(10,189,198,.40); background: rgba(10,189,198,.18); }
 
-.RowActions{
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
+.RowActions{ display: flex; gap: 8px; justify-content: flex-end; }
 
-button{
-  cursor: pointer;
-  border: 1px solid transparent;
-  font-weight: 800;
-}
+button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
 
 .PrimaryBtn{
   background: linear-gradient(135deg, var(--vivid-orchid), var(--velvet-orchid));
@@ -220,12 +176,6 @@ button{
   border-radius: 999px;
   border: 1px solid rgba(235,235,255,.14);
 }
-.PrimaryBtn:disabled{
-  opacity: .55;
-  cursor: not-allowed;
-  filter: saturate(.7);
-}
-
 .GhostBtn{
   background: rgba(235,235,255,.04);
   color: var(--text);
@@ -248,6 +198,11 @@ button{
   padding: 10px 12px;
   border-radius: 999px;
 }
+.PrimaryBtn:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+  filter: saturate(.7);
+}
 
 .ActiveSession{
   border: 1px solid rgba(10,189,198,.25);
@@ -260,13 +215,8 @@ button{
   display: grid;
   gap: 10px;
 }
-.ActiveSession strong{
-  font-size: 14px;
-  font-family: var(--titleFont);
-}
-.ActiveSession small{
-  color: var(--muted);
-}
+.ActiveSession strong{ font-size: 14px; font-family: var(--titleFont); }
+.ActiveSession small{ color: var(--muted); }
 
 .TimerLine{
   border: 1px solid rgba(235,235,255,.16);
@@ -274,7 +224,7 @@ button{
   border-radius: var(--radius);
   padding: 10px 12px;
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 .TimerLine .MainLine{
   display: flex;
@@ -289,6 +239,20 @@ button{
 .TimerLine .SubLine{
   font-size: 12px;
   color: rgba(235,235,255,.72);
+}
+.TimerLine .SubLine div{
+  margin-top: 4px;
+}
+
+/* Temporizador activo con color suave */
+.TimerLine.isRunning .MainLine span{
+  color: rgba(235, 235, 255, 0.86);
+}
+.TimerLine.isRunning #TimerRemain{
+  color: rgba(10, 189, 198, 0.78);
+}
+.TimerLine.isRunning .SubLine{
+  color: rgba(235, 235, 255, 0.68);
 }
 
 .Overlay{
@@ -328,19 +292,10 @@ button{
   display: grid;
   gap: 12px;
 }
-.Field{
-  display: grid;
-  gap: 6px;
-}
-.Field span{
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 900;
-}
-.Field small{
-  font-size: 11px;
-  color: rgba(235,235,255,.62);
-}
+.Field{ display: grid; gap: 6px; }
+.Field span{ font-size: 12px; color: var(--muted); font-weight: 900; }
+.Field small{ font-size: 11px; color: rgba(235,235,255,.62); }
+
 input, textarea, select{
   width: 100%;
   padding: 12px 12px;
@@ -351,6 +306,7 @@ input, textarea, select{
   outline: none;
 }
 textarea{ resize: none; }
+
 .Grid2{
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -412,26 +368,5 @@ textarea{ resize: none; }
   display: grid;
   gap: 4px;
 }
-.HintBox strong{
-  font-family: var(--titleFont);
-  font-size: 14px;
-}
-.HintBox small{
-  color: rgba(235,235,255,.72);
-}
-
-.TimerLine .SubLine div{
-  margin-top: 4px;
-}
-
-.TimerLine.isRunning .MainLine span{
-  color: rgba(235, 235, 255, 0.86);
-}
-
-.TimerLine.isRunning #TimerRemain{
-  color: rgba(10, 189, 198, 0.78); /* strong-cyan suave */
-}
-
-.TimerLine.isRunning .SubLine{
-  color: rgba(235, 235, 255, 0.68);
-}
+.HintBox strong{ font-family: var(--titleFont); font-size: 14px; }
+.HintBox small{ color: rgba(235,235,255,.72); }

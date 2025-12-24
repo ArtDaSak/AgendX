@@ -5,10 +5,8 @@ import { DateUtils } from "./DateUtils.js";
 const AppState = {
   view: "today",
   anchorDate: new Date(),
-
   isHydrated: false,
   isSaving: false,
-
   data: {
     events: [],
     activeDaySession: null
@@ -17,9 +15,8 @@ const AppState = {
 
 let timerTickId = null;
 
-// Se acumulan patches para no spamear la API
-let pendingRecPatch = null;
-let pendingRecPatchTimer = null;
+// Guardado debounced del progreso en recurrences
+let pendingSessionSaveTimer = null;
 
 const Dom = {
   Tabs: document.querySelectorAll(".TabBtn"),
@@ -55,11 +52,7 @@ const Dom = {
   RepeatConfig: document.getElementById("RepeatConfig")
 };
 
-boot().catch(err => {
-  console.error(err);
-  showToastLikeNotice("No se pudo cargar MockAPI. Revisa tu conexión o la URL.");
-  render();
-});
+boot();
 
 async function boot() {
   AppState.anchorDate = new Date();
@@ -68,8 +61,14 @@ async function boot() {
   wireEvents();
   renderLoading();
 
-  await hydrateFromApi();
-  AppState.isHydrated = true;
+  try {
+    await hydrateFromApi();
+    AppState.isHydrated = true;
+  } catch (err) {
+    console.error(err);
+    showToastLikeNotice("No se pudo cargar MockAPI. Revisa la URL o tu conexión.");
+    AppState.isHydrated = true;
+  }
 
   render();
 }
@@ -93,75 +92,81 @@ function wireEvents() {
 
   Dom.StartDayBtn.addEventListener("click", startDayOnly);
 
-  Dom.OpenCreateBtn.addEventListener("click", () => openEventSheetForCreate());
+  Dom.OpenCreateBtn.addEventListener("click", openEventSheetForCreate);
 
   Dom.CloseEventSheetBtn.addEventListener("click", closeEventSheet);
   Dom.CancelEventBtn.addEventListener("click", closeEventSheet);
   Dom.Overlay.addEventListener("click", closeEventSheet);
 
   Dom.RepeatType.addEventListener("change", () => renderRepeatConfig(Dom.RepeatConfig, Dom.RepeatType.value, null));
-  Dom.EventKind.addEventListener("change", () => applyKindUI());
+  Dom.EventKind.addEventListener("change", applyKindUI);
 
   Dom.EventForm.addEventListener("submit", onSubmitEvent);
-
   Dom.DeleteBtn.addEventListener("click", onDeleteEvent);
 }
 
+function renderLoading() {
+  Dom.OccurrenceList.innerHTML = `<div class="Empty">Cargando…</div>`;
+  Dom.StartDayBtn.disabled = true;
+  Dom.OpenCreateBtn.disabled = true;
+}
+
 async function hydrateFromApi() {
-  // Se cargan eventos
   const events = await Api.getEvents();
   AppState.data.events = Array.isArray(events) ? events : [];
 
-  // Se cargan recurrences y se aplica limpieza
   const recs = await Api.getRecurrences();
   const list = Array.isArray(recs) ? recs : [];
 
   const todayKey = DateUtils.toLocalDateKey(new Date());
   const now = Date.now();
 
-  // Se busca un active
-  const actives = list.filter(r => r.status === "active");
-  for (const r of actives) {
+  // Se limpia cualquier registro vencido o active de otro día
+  for (const r of list) {
     const keepUntil = r.keepUntil ? new Date(r.keepUntil).getTime() : null;
-    const shouldDelete = (r.dayKey !== todayKey) || (keepUntil && now > keepUntil);
+    const expired = keepUntil && now > keepUntil;
+    const invalidActive = (r.status === "active" && r.dayKey !== todayKey);
 
-    if (shouldDelete) {
+    if (expired || invalidActive) {
       await safeDeleteRecurrence(r.id);
     }
   }
 
-  // Se recarga una vez más y se toma el active de hoy si existe
+  // Se vuelve a consultar para quedar limpio y tomar el active de hoy
   const recs2 = await Api.getRecurrences();
   const list2 = Array.isArray(recs2) ? recs2 : [];
 
-  const todayActive = list2.find(r => r.status === "active" && r.dayKey === todayKey) ?? null;
+  const todayActives = list2.filter(r => r.status === "active" && r.dayKey === todayKey);
 
-  if (todayActive) {
-    AppState.data.activeDaySession = {
-      remoteId: todayActive.id,
-      dayKey: todayActive.dayKey,
-      startedAtIso: todayActive.startedAtIso,
-      planCount: todayActive.plan?.length ?? 0,
-      plan: Array.isArray(todayActive.plan) ? todayActive.plan : [],
-      doneByOccId: todayActive.doneByOccId ?? {},
-      currentIndex: Number(todayActive.currentIndex ?? 0)
-    };
+  // Si hay más de 1 active, se deja solo el más reciente y se eliminan los otros
+  if (todayActives.length > 1) {
+    const sorted = [...todayActives].sort((a, b) => new Date(b.startedAtIso) - new Date(a.startedAtIso));
+    const keep = sorted[0];
+    for (const extra of sorted.slice(1)) await safeDeleteRecurrence(extra.id);
+    setActiveSessionFromRemote(keep);
+  } else if (todayActives.length === 1) {
+    setActiveSessionFromRemote(todayActives[0]);
   } else {
     AppState.data.activeDaySession = null;
   }
 }
 
-function renderLoading() {
-  Dom.OccurrenceList.innerHTML = `<div class="Empty">Cargando datos…</div>`;
-  Dom.StartDayBtn.disabled = true;
-  Dom.OpenCreateBtn.disabled = true;
+function setActiveSessionFromRemote(remote) {
+  AppState.data.activeDaySession = {
+    remoteId: remote.id,
+    dayKey: remote.dayKey,
+    startedAtIso: remote.startedAtIso,
+    keepUntil: remote.keepUntil ?? endOfDayIso(remote.dayKey),
+    plan: Array.isArray(remote.plan) ? remote.plan : [],
+    doneByOccId: remote.doneByOccId ?? {},
+    currentIndex: Number(remote.currentIndex ?? 0)
+  };
 }
 
 function shiftAnchor(direction) {
   if (AppState.view === "today") AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction);
   else if (AppState.view === "week") AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 7);
   else AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 30);
-
   render();
 }
 
@@ -190,7 +195,6 @@ function render() {
   if (AppState.view === "today") {
     const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
 
-    // Si el día está iniciado, se muestra el snapshot guardado en MockAPI
     if (AppState.data.activeDaySession?.dayKey === dayKey) {
       occurrences = AppState.data.activeDaySession.plan ?? [];
     } else {
@@ -214,10 +218,7 @@ function render() {
   });
 
   Dom.OccurrenceList.querySelectorAll("[data-toggle-done]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const occId = btn.dataset.toggleDone;
-      toggleDone(occId);
-    });
+    btn.addEventListener("click", () => toggleDone(btn.dataset.toggleDone));
   });
 }
 
@@ -299,14 +300,13 @@ function rowHtml(occ) {
 }
 
 /* -------------------------
-   Botón Iniciar día
+   Iniciar día
 -------------------------- */
 
 function updateStartDayButtonState() {
   const todayKey = DateUtils.toLocalDateKey(new Date());
   const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
 
-  // Solo se permite iniciar el día de hoy, para evitar múltiples actives
   if (dayKey !== todayKey) {
     Dom.StartDayBtn.disabled = true;
     Dom.StartDayBtn.textContent = "Iniciar día";
@@ -315,7 +315,6 @@ function updateStartDayButtonState() {
   }
 
   const sessionSameDay = AppState.data.activeDaySession?.dayKey === dayKey;
-
   if (sessionSameDay) {
     Dom.StartDayBtn.disabled = true;
     Dom.StartDayBtn.textContent = "Día iniciado";
@@ -332,7 +331,7 @@ function updateStartDayButtonState() {
 }
 
 async function startDayOnly() {
-  if (!AppState.isHydrated || AppState.isSaving) return;
+  if (AppState.isSaving) return;
 
   const todayKey = DateUtils.toLocalDateKey(new Date());
   const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
@@ -345,8 +344,6 @@ async function startDayOnly() {
   if (AppState.data.activeDaySession?.dayKey === dayKey) return;
 
   const plan = buildDayPlan(dayKey);
-
-  // Si no hay rangos, no se permite iniciar
   if (!plan || plan.length === 0) {
     showToastLikeNotice("No puedes iniciar el día porque no hay eventos para hoy.");
     return;
@@ -356,10 +353,8 @@ async function startDayOnly() {
   render();
 
   const nowIso = new Date().toISOString();
-  const keepUntilIso = endOfDayIso(dayKey);
 
   const doneByOccId = Object.fromEntries(plan.map(o => [o.occurrenceId, false]));
-
   const payload = {
     dayKey,
     status: "active",
@@ -368,7 +363,7 @@ async function startDayOnly() {
     plan,
     doneByOccId,
     currentIndex: 0,
-    keepUntil: keepUntilIso,
+    keepUntil: endOfDayIso(dayKey),
     createdAt: nowIso,
     updatedAt: nowIso
   };
@@ -377,21 +372,10 @@ async function startDayOnly() {
     // Se asegura que no exista otro active remoto
     const recs = await Api.getRecurrences();
     const actives = (Array.isArray(recs) ? recs : []).filter(r => r.status === "active");
-    for (const r of actives) {
-      await safeDeleteRecurrence(r.id);
-    }
+    for (const r of actives) await safeDeleteRecurrence(r.id);
 
     const created = await Api.createRecurrence(payload);
-
-    AppState.data.activeDaySession = {
-      remoteId: created.id,
-      dayKey: created.dayKey,
-      startedAtIso: created.startedAtIso,
-      planCount: created.plan?.length ?? plan.length,
-      plan: created.plan ?? plan,
-      doneByOccId: created.doneByOccId ?? doneByOccId,
-      currentIndex: Number(created.currentIndex ?? 0)
-    };
+    setActiveSessionFromRemote(created);
   } catch (err) {
     console.error(err);
     showToastLikeNotice("No se pudo iniciar el día en MockAPI.");
@@ -408,7 +392,7 @@ function endOfDayIso(dayKey) {
 }
 
 /* -------------------------
-   Plan del día + Regla Descanso
+   Plan del día + Regla descanso
 -------------------------- */
 
 function buildDayPlan(dayKey) {
@@ -443,7 +427,72 @@ function isRestTitle(title) {
 }
 
 /* -------------------------
-   Progreso + Siguiente rango
+   Recalcular día activo si cambian eventos
+-------------------------- */
+
+async function recalculateActiveDayIfNeeded() {
+  const session = AppState.data.activeDaySession;
+  if (!session?.remoteId) return;
+
+  const todayKey = DateUtils.toLocalDateKey(new Date());
+  if (session.dayKey !== todayKey) return;
+
+  const newPlan = buildDayPlan(todayKey);
+
+  // Si al recalcular queda vacío, se cierra
+  if (!newPlan || newPlan.length === 0) {
+    await safeDeleteRecurrence(session.remoteId);
+    AppState.data.activeDaySession = null;
+    showToastLikeNotice("El día activo se cerró porque ya no hay rangos para hoy.");
+    return;
+  }
+
+  // Se preserva progreso por occurrenceId
+  const oldDone = session.doneByOccId ?? {};
+  const newDone = Object.fromEntries(newPlan.map(o => [o.occurrenceId, Boolean(oldDone[o.occurrenceId])]));
+
+  // Se intenta mantener el rango actual si aún existe
+  const oldCurrentOccId = session.plan?.[session.currentIndex]?.occurrenceId ?? null;
+  let newIndex = oldCurrentOccId ? newPlan.findIndex(o => o.occurrenceId === oldCurrentOccId) : 0;
+  if (newIndex < 0) newIndex = 0;
+
+  session.plan = newPlan;
+  session.doneByOccId = newDone;
+  session.currentIndex = newIndex;
+
+  // Ajusta currentIndex hacia un pendiente si se puede
+  getCurrentOccurrence(session);
+
+  // Se guarda inmediatamente completo (PUT estable)
+  await saveActiveSessionToApiNow();
+}
+
+async function saveActiveSessionToApiNow() {
+  const session = AppState.data.activeDaySession;
+  if (!session?.remoteId) return;
+
+  const payload = {
+    dayKey: session.dayKey,
+    status: "active",
+    startedAtIso: session.startedAtIso,
+    endedAtIso: null,
+    plan: session.plan,
+    doneByOccId: session.doneByOccId,
+    currentIndex: session.currentIndex,
+    keepUntil: endOfDayIso(session.dayKey),
+    updatedAt: new Date().toISOString()
+  };
+
+  try {
+    await Api.updateRecurrence(session.remoteId, payload);
+  } catch (err) {
+    console.error(err);
+    showToastLikeNotice("No se pudo sincronizar la sesión con MockAPI.");
+  }
+}
+
+/* -------------------------
+   Progreso
 -------------------------- */
 
 function toggleDone(occurrenceId) {
@@ -459,11 +508,7 @@ function toggleDone(occurrenceId) {
     moveToNext(session);
   }
 
-  queueRecurrencePatch({
-    doneByOccId: session.doneByOccId,
-    currentIndex: session.currentIndex
-  });
-
+  queueActiveSessionSave();
   render();
 }
 
@@ -496,8 +541,15 @@ function getCurrentOccurrence(session) {
   return current;
 }
 
+function queueActiveSessionSave() {
+  clearTimeout(pendingSessionSaveTimer);
+  pendingSessionSaveTimer = setTimeout(() => {
+    saveActiveSessionToApiNow();
+  }, 450);
+}
+
 /* -------------------------
-   Temporizador en vivo + render session
+   Temporizador + sesión render
 -------------------------- */
 
 function renderActiveDaySession() {
@@ -511,7 +563,7 @@ function renderActiveDaySession() {
     return;
   }
 
-  // Si cambia el día mientras la app está abierta, se limpia el active remoto
+  // Si cambia el día, se limpia el active remoto
   if (todayKey !== session.dayKey) {
     safeDeleteRecurrence(session.remoteId).finally(() => {
       AppState.data.activeDaySession = null;
@@ -556,7 +608,7 @@ function renderActiveDaySession() {
   if (isSameDay) {
     document.getElementById("NextRangeBtn")?.addEventListener("click", () => {
       moveToNext(session);
-      queueRecurrencePatch({ currentIndex: session.currentIndex });
+      queueActiveSessionSave();
       render();
     });
 
@@ -567,11 +619,7 @@ function renderActiveDaySession() {
       session.doneByOccId[current.occurrenceId] = true;
       moveToNext(session);
 
-      queueRecurrencePatch({
-        doneByOccId: session.doneByOccId,
-        currentIndex: session.currentIndex
-      });
-
+      queueActiveSessionSave();
       render();
     });
 
@@ -582,60 +630,54 @@ function renderActiveDaySession() {
 function startTimerTick(session) {
   const tick = () => {
     const current = getCurrentOccurrence(session);
+
+    const timerLine = document.getElementById("TimerLine");
     const mainEl = document.getElementById("TimerMain");
     const remainEl = document.getElementById("TimerRemain");
     const subEl = document.getElementById("TimerSub");
 
     if (!mainEl || !remainEl || !subEl) return;
 
-if (!current) {
-  mainEl.textContent = "Sin rango actual";
-  remainEl.textContent = "";
-  subEl.textContent = "";
-  const timerLine = document.getElementById("TimerLine");
-  if (timerLine) timerLine.classList.remove("isRunning");
-  return;
-}
+    if (!current) {
+      mainEl.textContent = "Sin rango actual";
+      remainEl.textContent = "";
+      subEl.textContent = "";
+      timerLine?.classList.remove("isRunning");
+      return;
+    }
 
     const schedule = buildSchedule(session);
     const item = schedule.find(x => x.occurrenceId === current.occurrenceId);
 
     mainEl.textContent = `R${current.rangeOrder} · ${current.title}`;
 
-if (!item || item.durationSec <= 0) {
-  remainEl.textContent = "Sin duración";
-  subEl.textContent = "Define minutos para ver el temporizador en tiempo real";
-  const timerLine = document.getElementById("TimerLine");
-  if (timerLine) timerLine.classList.remove("isRunning");
-  return;
-}
+    if (!item || item.durationSec <= 0) {
+      remainEl.textContent = "Sin duración";
+      subEl.textContent = "Define minutos para ver el temporizador en tiempo real";
+      timerLine?.classList.remove("isRunning");
+      return;
+    }
 
     const now = Date.now();
-    const endMs = item.endMs;
-    const startMs = item.startMs;
-
-    const remainSec = Math.max(0, Math.floor((endMs - now) / 1000));
-    const elapsedSec = Math.max(0, Math.floor((now - startMs) / 1000));
-
+    const remainSec = Math.max(0, Math.floor((item.endMs - now) / 1000));
+    const elapsedSec = Math.max(0, Math.floor((now - item.startMs) / 1000));
     remainEl.textContent = `-${DateUtils.formatHMS(remainSec)}`;
 
     const pendingRemainMs = schedule
       .filter(x => !session.doneByOccId[x.occurrenceId])
       .reduce((acc, x) => acc + Math.max(0, x.endMs - Math.max(now, x.startMs)), 0);
 
-const timerLine = document.getElementById("TimerLine");
+    subEl.innerHTML = `
+      <div>Transcurrido ${DateUtils.formatHMS(elapsedSec)}</div>
+      <div>Faltan ${DateUtils.formatHMS(remainSec)} para concluir</div>
+      <div>Restante total (estimado): ${DateUtils.formatHMS(Math.floor(pendingRemainMs / 1000))}</div>
+    `;
 
-subEl.innerHTML = `
-  <div>Transcurrido ${DateUtils.formatHMS(elapsedSec)}</div>
-  <div>Faltan ${DateUtils.formatHMS(remainSec)} para concluir</div>
-  <div>Restante total (estimado): ${DateUtils.formatHMS(Math.floor(pendingRemainMs / 1000))}</div>
-`;
-
-// Marca visual de “temporizador activo”
-if (timerLine) timerLine.classList.add("isRunning");
-
+    timerLine?.classList.add("isRunning");
+  };
 
   tick();
+  stopTimerTick();
   timerTickId = setInterval(tick, 1000);
 }
 
@@ -665,71 +707,8 @@ function buildSchedule(session) {
   return schedule;
 }
 
-async function recalculateActiveDayIfNeeded() {
-  const session = AppState.data.activeDaySession;
-  if (!session?.remoteId) return;
-
-  const todayKey = DateUtils.toLocalDateKey(new Date());
-  if (session.dayKey !== todayKey) return;
-
-  // Se reconstruye el plan (incluye regla de descansos)
-  const newPlan = buildDayPlan(todayKey);
-
-  // Si al recalcular no queda nada, se termina la sesión
-  if (!newPlan || newPlan.length === 0) {
-    // Se detiene cualquier patch pendiente
-    pendingRecPatch = null;
-    clearTimeout(pendingRecPatchTimer);
-
-    await safeDeleteRecurrence(session.remoteId);
-    AppState.data.activeDaySession = null;
-    showToastLikeNotice("El día activo se cerró porque ya no hay rangos para hoy.");
-    return;
-  }
-
-  // Se preserva el progreso existente por occurrenceId
-  const oldDone = session.doneByOccId ?? {};
-  const newDoneByOccId = Object.fromEntries(
-    newPlan.map(o => [o.occurrenceId, Boolean(oldDone[o.occurrenceId])])
-  );
-
-  // Se intenta mantener el rango actual si sigue existiendo
-  const oldCurrentOccId = session.plan?.[session.currentIndex]?.occurrenceId ?? null;
-  let newIndex = oldCurrentOccId
-    ? newPlan.findIndex(o => o.occurrenceId === oldCurrentOccId)
-    : 0;
-
-  if (newIndex < 0) newIndex = 0;
-
-  // Se actualiza sesión local
-  session.plan = newPlan;
-  session.planCount = newPlan.length;
-  session.doneByOccId = newDoneByOccId;
-  session.currentIndex = newIndex;
-
-  // Asegura que currentIndex caiga sobre un pendiente si es posible
-  getCurrentOccurrence(session);
-
-  // Se detiene patch pendiente y se sincroniza “ya”
-  pendingRecPatch = null;
-  clearTimeout(pendingRecPatchTimer);
-
-  try {
-    await Api.patchRecurrence(session.remoteId, {
-      plan: session.plan,
-      doneByOccId: session.doneByOccId,
-      currentIndex: session.currentIndex,
-      keepUntil: endOfDayIso(session.dayKey),
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error(err);
-    showToastLikeNotice("No se pudo recalcular el plan del día en MockAPI.");
-  }
-}
-
 /* -------------------------
-   CRUD Events -> MockAPI
+   CRUD Events
 -------------------------- */
 
 function openEventSheetForCreate() {
@@ -738,6 +717,7 @@ function openEventSheetForCreate() {
 
   Dom.EventId.value = "";
   Dom.EventKind.value = "event";
+
   Dom.TitleInput.value = "";
   Dom.RangeOrderInput.value = "10";
   Dom.DurationInput.value = "45";
@@ -841,7 +821,10 @@ async function onSubmitEvent(e) {
       const created = await Api.createEvent(payload);
       AppState.data.events.push(created);
     } else {
-      const updated = await Api.updateEvent(id, payload);
+      // Se hace PUT con payload completo más los campos antiguos que no se quieran perder
+      const prev = AppState.data.events.find(x => x.id === id) ?? {};
+      const merged = { ...prev, ...payload };
+      const updated = await Api.updateEvent(id, merged);
       const idx = AppState.data.events.findIndex(x => x.id === id);
       if (idx >= 0) AppState.data.events[idx] = updated;
     }
@@ -867,6 +850,7 @@ async function onDeleteEvent() {
   try {
     await Api.deleteEvent(id);
     AppState.data.events = AppState.data.events.filter(e => e.id !== id);
+
     await recalculateActiveDayIfNeeded();
     closeEventSheet();
   } catch (err) {
@@ -879,48 +863,7 @@ async function onDeleteEvent() {
 }
 
 /* -------------------------
-   Persistencia progreso -> MockAPI (recurrences)
--------------------------- */
-
-function queueRecurrencePatch(fields) {
-  const session = AppState.data.activeDaySession;
-  if (!session?.remoteId) return;
-
-  const nowIso = new Date().toISOString();
-  pendingRecPatch = { ...(pendingRecPatch ?? {}), ...fields, updatedAt: nowIso };
-
-  clearTimeout(pendingRecPatchTimer);
-  pendingRecPatchTimer = setTimeout(async () => {
-    const patch = pendingRecPatch;
-    pendingRecPatch = null;
-
-    try {
-      await Api.patchRecurrence(session.remoteId, {
-        dayKey: session.dayKey,
-        status: "active",
-        startedAtIso: session.startedAtIso,
-        endedAtIso: null,
-        plan: session.plan,
-        keepUntil: endOfDayIso(session.dayKey),
-        ...patch
-      });
-    } catch (err) {
-      console.error(err);
-      showToastLikeNotice("No se pudo sincronizar el progreso con MockAPI.");
-    }
-  }, 450);
-}
-
-async function safeDeleteRecurrence(id) {
-  try {
-    await Api.deleteRecurrence(id);
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-/* -------------------------
-   Repeat Config (UI)
+   Repeat config
 -------------------------- */
 
 function renderRepeatConfig(container, type, eventOrNull) {
@@ -1051,7 +994,15 @@ function buildRepeat(type, container) {
 }
 
 /* -------------------------
-   Avisos
+   API helpers
+-------------------------- */
+
+async function safeDeleteRecurrence(id) {
+  try { await Api.deleteRecurrence(id); } catch (err) { console.error(err); }
+}
+
+/* -------------------------
+   Avisos y helpers
 -------------------------- */
 
 function showToastLikeNotice(message) {
@@ -1068,17 +1019,12 @@ function showToastLikeNotice(message) {
 
   window.clearTimeout(showToastLikeNotice._t);
   showToastLikeNotice._t = window.setTimeout(() => {
-    // Se limpia si no hay sesión activa
     if (!AppState.data.activeDaySession) {
       Dom.ActiveSession.classList.remove("isVisible");
       Dom.ActiveSession.innerHTML = "";
     }
   }, 3200);
 }
-
-/* -------------------------
-   Helpers
--------------------------- */
 
 function repeatToLabel(type) {
   if (type === "none") return "Único";
@@ -1097,5 +1043,4 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-}
 }

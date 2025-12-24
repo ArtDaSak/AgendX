@@ -20,7 +20,7 @@ export const DateUtils = {
   startOfWeek(date) {
     const copy = new Date(date);
     const day = copy.getDay();
-    const diff = (day + 6) % 7; // Lunes
+    const diff = (day + 6) % 7;
     copy.setDate(copy.getDate() - diff);
     copy.setHours(0, 0, 0, 0);
     return copy;
