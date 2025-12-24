@@ -1,29 +1,50 @@
-const StorageKey = "AgendXDataV2";
+const ApiTemplate = "https://694bac9c26e870772068c665.mockapi.io/:endpoint";
+const ApiRoot = ApiTemplate.replace("/:endpoint", "");
 
-export const Storage = {
-  load() {
-    try {
-      const raw = localStorage.getItem(StorageKey);
-      if (!raw) return this.defaultState();
+async function requestJson(method, endpoint, body = null) {
+  const url = `${ApiRoot}/${endpoint}`;
 
-      const parsed = JSON.parse(raw);
-      return {
-        events: Array.isArray(parsed.events) ? parsed.events : [],
-        activeDaySession: parsed.activeDaySession ?? null
-      };
-    } catch {
-      return this.defaultState();
-    }
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : null
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`API ${method} ${endpoint} -> ${res.status} ${text}`);
+  }
+
+  // MockAPI responde JSON en casi todo
+  return res.status === 204 ? null : res.json();
+}
+
+export const Api = {
+  // Events
+  getEvents() {
+    return requestJson("GET", "events");
+  },
+  createEvent(payload) {
+    return requestJson("POST", "events", payload);
+  },
+  updateEvent(id, payload) {
+    return requestJson("PUT", `events/${id}`, payload);
+  },
+  deleteEvent(id) {
+    return requestJson("DELETE", `events/${id}`);
   },
 
-  save(data) {
-    localStorage.setItem(StorageKey, JSON.stringify(data));
+  // Recurrences (sesión diaria)
+  getRecurrences() {
+    return requestJson("GET", "recurrences");
   },
-
-  defaultState() {
-    return {
-      events: [],
-      activeDaySession: null
-    };
+  createRecurrence(payload) {
+    return requestJson("POST", "recurrences", payload);
+  },
+  patchRecurrence(id, patch) {
+    return requestJson("PUT", `recurrences/${id}`, patch);
+  },
+  deleteRecurrence(id) {
+    return requestJson("DELETE", `recurrences/${id}`);
   }
 };
