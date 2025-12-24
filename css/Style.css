@@ -220,6 +220,12 @@ button{
   border-radius: 999px;
   border: 1px solid rgba(235,235,255,.14);
 }
+.PrimaryBtn:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+  filter: saturate(.7);
+}
+
 .GhostBtn{
   background: rgba(235,235,255,.04);
   color: var(--text);

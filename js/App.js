@@ -107,6 +107,7 @@ function shiftAnchor(direction) {
 
 function render() {
   renderActiveDaySession();
+  updateStartDayButtonState();
 
   const { rangeStart, rangeEnd, title } = computeRange();
   Dom.ListTitle.textContent = title;
@@ -242,9 +243,14 @@ function startDayOnly() {
 
   const plan = buildDayPlan(dayKey);
 
+  if (!plan || plan.length === 0) {
+    showToastLikeNotice("No puedes iniciar el día porque no hay eventos para hoy.");
+    return;
+  }
+
   AppState.data.activeDaySession = {
     dayKey,
-    startedAtIso: new Date().toISOString(),  // exacto, sin redondeo
+    startedAtIso: new Date().toISOString(), // exacto, sin redondeo
     planCount: plan.length,
     plan,
     doneByOccId: Object.fromEntries(plan.map(o => [o.occurrenceId, false])),
@@ -254,6 +260,7 @@ function startDayOnly() {
   Storage.save(AppState.data);
   render();
 }
+
 
 function buildDayPlan(dayKey) {
   const dayStart = DateUtils.fromLocalDateKey(dayKey);
@@ -566,6 +573,31 @@ function closeEventSheet() {
   Dom.EventSheet.hidden = true;
 }
 
+function showToastLikeNotice(message) {
+  // Se muestra un aviso simple en la caja superior (sin iniciar sesión)
+  Dom.ActiveSession.classList.add("isVisible");
+  Dom.ActiveSession.innerHTML = `
+    <div class="TimerLine">
+      <div class="MainLine">
+        <span>AgendX</span>
+        <span>⚠️</span>
+      </div>
+      <div class="SubLine">${escapeHtml(message)}</div>
+    </div>
+  `;
+
+  // Se oculta luego de unos segundos para no estorbar
+  window.clearTimeout(showToastLikeNotice._t);
+  showToastLikeNotice._t = window.setTimeout(() => {
+    // Solo se limpia si NO se inició nada entre tanto
+    const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+    if (!AppState.data.activeDaySession || AppState.data.activeDaySession.dayKey !== dayKey) {
+      Dom.ActiveSession.classList.remove("isVisible");
+      Dom.ActiveSession.innerHTML = "";
+    }
+  }, 3200);
+}
+
 function onSubmitEvent(e) {
   e.preventDefault();
 
@@ -735,6 +767,29 @@ function buildRepeat(type, container) {
   }
 
   return { type: "none" };
+}
+
+function updateStartDayButtonState() {
+  const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+  const sessionSameDay = AppState.data.activeDaySession?.dayKey === dayKey;
+
+  // Si ya se inició este día, el botón deja de servir (solo inicia)
+  if (sessionSameDay) {
+    Dom.StartDayBtn.disabled = true;
+    Dom.StartDayBtn.textContent = "Día iniciado";
+    Dom.StartDayBtn.title = "Ya se inició este día";
+    return;
+  }
+
+  // Se calcula el plan efectivo del día (incluye regla de descansos)
+  const plan = buildDayPlan(dayKey);
+  const hasPlan = Array.isArray(plan) && plan.length > 0;
+
+  Dom.StartDayBtn.disabled = !hasPlan;
+  Dom.StartDayBtn.textContent = "Iniciar día";
+  Dom.StartDayBtn.title = hasPlan
+    ? "Inicia todos los rangos de hoy"
+    : "Agrega al menos un evento para poder iniciar";
 }
 
 /* -------------------------
