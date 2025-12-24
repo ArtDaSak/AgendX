@@ -3,9 +3,8 @@ import { DateUtils } from "./DateUtils.js";
 export const Recurrence = {
     buildOccurrences(events, startDate, endDate) {
         const startKey = DateUtils.toLocalDateKey(startDate);
-        const endKey = DateUtils.toLocalDateKey(endDate);
-
         const days = [];
+
         for (let d = DateUtils.fromLocalDateKey(startKey); d <= endDate; d = DateUtils.addDays(d, 1)) {
             days.push(DateUtils.toLocalDateKey(d));
         }
@@ -13,19 +12,25 @@ export const Recurrence = {
         const occurrences = [];
 
         for (const event of events) {
-            const eventStartKey = event.startOn ?? startKey;
+            const eventId = String(event.id ?? "");
+            if (!eventId) continue;
+
+            const startOn = event.startOn ?? startKey;
 
             for (const dayKey of days) {
-                if (dayKey < eventStartKey) continue;
+                if (dayKey < startOn) continue;
 
                 if (this.matches(event, dayKey)) {
+                    const rangeOrder = Number(event.rangeOrder ?? 999);
+                    const occurrenceId = `${eventId}__${dayKey}__R${rangeOrder}`;
+
                     occurrences.push({
-                        occurrenceId: `${event.id}__${dayKey}`,
-                        eventId: event.id,
+                        occurrenceId,
+                        eventId,
                         dayKey,
-                        title: event.title,
+                        title: event.title ?? "",
                         notes: event.notes ?? "",
-                        rangeOrder: Number(event.rangeOrder ?? 999),
+                        rangeOrder,
                         durationMin: event.durationMin ?? null,
                         repeat: event.repeat ?? { type: "none" }
                     });
@@ -35,7 +40,8 @@ export const Recurrence = {
 
         occurrences.sort((a, b) => {
             if (a.dayKey !== b.dayKey) return a.dayKey.localeCompare(b.dayKey);
-            return a.rangeOrder - b.rangeOrder;
+            if (a.rangeOrder !== b.rangeOrder) return a.rangeOrder - b.rangeOrder;
+            return String(a.eventId).localeCompare(String(b.eventId));
         });
 
         return occurrences;
@@ -69,8 +75,7 @@ export const Recurrence = {
             const everyDays = Number(event.repeat?.everyDays ?? 1);
             const start = DateUtils.fromLocalDateKey(event.startOn);
             const cur = DateUtils.fromLocalDateKey(dayKey);
-            const diffMs = cur - start;
-            const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+            const diffDays = Math.floor((cur - start) / (24 * 60 * 60 * 1000));
             return diffDays % everyDays === 0;
         }
 

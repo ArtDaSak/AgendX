@@ -30,16 +30,23 @@ body{
     color: var(--text);
 }
 
-h1,h2,h3{
+h1, h2, h3{
     font-family: var(--titleFont);
     letter-spacing: .8px;
+}
+
+button{
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-weight: 800;
+    touch-action: manipulation;
 }
 
 .TopBar{
     position: sticky;
     top: 0;
     z-index: 20;
-    padding: 12px 14px;
+    padding: 16px 14px;
     backdrop-filter: blur(10px);
     background: rgba(9, 24, 51, 0.72);
     border-bottom: 1px solid var(--stroke);
@@ -79,7 +86,7 @@ h1,h2,h3{
 .Main{
     max-width: var(--max);
     margin: 0 auto;
-    padding: 12px 14px;
+    padding: 14px;
     display: grid;
     gap: 12px;
 }
@@ -89,6 +96,7 @@ h1,h2,h3{
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
 }
+
 .TabBtn{
     border: 1px solid var(--stroke);
     background: rgba(235,235,255,.04);
@@ -97,6 +105,7 @@ h1,h2,h3{
     border-radius: 999px;
     font-weight: 800;
 }
+
 .TabBtn.isActive{
     background: linear-gradient(135deg, rgba(234,0,217,.26), rgba(10,189,198,.18));
     border-color: rgba(10,189,198,.30);
@@ -109,15 +118,18 @@ h1,h2,h3{
     box-shadow: var(--shadow);
     overflow: hidden;
 }
+
 .CardHeader{
-    padding: 12px 14px 10px;
+    padding: 14px 14px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 10px;
     border-bottom: 1px solid var(--stroke);
 }
+
 .CardHeader h2{ margin: 0; font-size: 18px; }
+
 .InlineControls{
     display: flex;
     gap: 8px;
@@ -126,10 +138,12 @@ h1,h2,h3{
     justify-content: flex-end;
 }
 
+/* ✅ LISTA SIEMPRE 1 COLUMNA (NO GRID) */
 .List{
-    padding: 12px 14px;
-    display: grid;
-    gap: 12px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .Row{
@@ -140,8 +154,20 @@ h1,h2,h3{
     display: grid;
     gap: 8px;
 }
-.RowTop{ display: flex; justify-content: space-between; gap: 10px; }
+
+.Row.isCurrent{
+    border-color: rgba(10,189,198,.45);
+    box-shadow: 0 0 0 6px rgba(10,189,198,.06);
+}
+
+.RowTop{
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
 .TitleLine{ min-width: 0; }
+
 .TitleLine strong{
     display: block;
     font-size: 14px;
@@ -149,9 +175,55 @@ h1,h2,h3{
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.TitleLine small{ color: var(--muted); font-size: 12px; }
 
-.Badges{ display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.TitleLine small{
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.NotesMd{
+    display: block;
+    color: rgba(235,235,255,.74);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.NotesMd a{
+    color: rgba(10,189,198,.85);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(10,189,198,.35);
+}
+
+.NotesMd a:hover{
+    border-bottom-color: rgba(10,189,198,.70);
+}
+
+.NotesMd code{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(235,235,255,.16);
+    background: rgba(235,235,255,.05);
+    color: rgba(235,235,255,.88);
+}
+
+.NotesMd ul{
+    margin: 6px 0 0 18px;
+    padding: 0;
+}
+
+.NotesMd li{
+    margin: 2px 0;
+}
+
+.Badges{
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .Badge{
     font-size: 11px;
     padding: 4px 8px;
@@ -160,14 +232,18 @@ h1,h2,h3{
     color: var(--text);
     background: rgba(19,62,124,.18);
 }
+
 .Badge.isAccent{ border-color: rgba(234,0,217,.30); background: rgba(234,0,217,.12); }
 .Badge.isCyan{ border-color: rgba(10,189,198,.30); background: rgba(10,189,198,.12); }
 .Badge.isWarn{ border-color: rgba(235,235,255,.30); background: rgba(235,235,255,.10); }
 .Badge.isDone{ border-color: rgba(10,189,198,.40); background: rgba(10,189,198,.18); }
 
-.RowActions{ display: flex; gap: 8px; justify-content: flex-end; }
-
-button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
+.RowActions{
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
 
 .PrimaryBtn{
     background: linear-gradient(135deg, var(--vivid-orchid), var(--velvet-orchid));
@@ -176,6 +252,7 @@ button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
     border-radius: 999px;
     border: 1px solid rgba(235,235,255,.14);
 }
+
 .GhostBtn{
     background: rgba(235,235,255,.04);
     color: var(--text);
@@ -183,6 +260,7 @@ button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
     border-radius: 999px;
     border: 1px solid var(--stroke);
 }
+
 .IconBtn{
     width: 40px;
     height: 40px;
@@ -191,14 +269,24 @@ button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
     border: 1px solid var(--stroke);
     color: var(--text);
 }
+
 .DangerBtn{
-    background: rgba(234,0,217,.14);
-    border: 1px solid rgba(234,0,217,.25);
+    background: rgba(234,0,217,.20);
+    border: 1px solid rgba(234,0,217,.34);
     color: var(--lavender);
     padding: 10px 12px;
     border-radius: 999px;
+    box-shadow: 0 0 0 6px rgba(234,0,217,.06);
 }
-.PrimaryBtn:disabled{
+
+.DangerBtn:hover{
+    background: rgba(234,0,217,.28);
+    border-color: rgba(234,0,217,.48);
+}
+
+.PrimaryBtn:disabled,
+.GhostBtn:disabled,
+.DangerBtn:disabled{
     opacity: .55;
     cursor: not-allowed;
     filter: saturate(.7);
@@ -211,11 +299,17 @@ button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
     padding: 12px 14px;
     display: none;
 }
+
 .ActiveSession.isVisible{
     display: grid;
     gap: 10px;
 }
-.ActiveSession strong{ font-size: 16px; font-family: var(--titleFont); }
+
+.ActiveSession strong{
+    font-size: 16px;
+    font-family: var(--titleFont);
+}
+
 .ActiveSession small{ color: var(--muted); }
 
 .TimerLine{
@@ -226,31 +320,36 @@ button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
     display: grid;
     gap: 6px;
 }
+
 .TimerLine .MainLine{
     display: flex;
     justify-content: space-between;
     gap: 10px;
     align-items: baseline;
 }
+
 .TimerLine .MainLine span{
     font-family: var(--titleFont);
     font-size: 18px;
 }
+
 .TimerLine .SubLine{
     font-size: 12px;
     color: rgba(235,235,255,.72);
 }
+
 .TimerLine .SubLine div{
     margin-top: 4px;
 }
 
-/* Temporizador activo con color suave */
 .TimerLine.isRunning .MainLine span{
     color: rgba(235, 235, 255, 0.86);
 }
+
 .TimerLine.isRunning #TimerRemain{
     color: rgba(10, 189, 198, 0.78);
 }
+
 .TimerLine.isRunning .SubLine{
     color: rgba(235, 235, 255, 0.68);
 }
@@ -261,6 +360,7 @@ button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
     background: rgba(0,0,0,.55);
     z-index: 50;
 }
+
 .Sheet{
     position: fixed;
     left: 0;
@@ -275,6 +375,7 @@ button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
     z-index: 60;
     box-shadow: var(--shadow);
 }
+
 .SheetHeader{
     padding: 12px 14px;
     display: flex;
@@ -282,16 +383,19 @@ button{ cursor: pointer; border: 1px solid transparent; font-weight: 800; }
     justify-content: space-between;
     border-bottom: 1px solid var(--stroke);
 }
+
 .SheetHeader h3{
     margin: 0;
     font-size: 18px;
     font-family: var(--titleFont);
 }
+
 .SheetBody{
     padding: 12px 14px 14px;
     display: grid;
     gap: 12px;
 }
+
 .Field{ display: grid; gap: 6px; }
 .Field span{ font-size: 12px; color: var(--muted); font-weight: 900; }
 .Field small{ font-size: 11px; color: rgba(235,235,255,.62); }
@@ -305,6 +409,7 @@ input, textarea, select{
     color: var(--text);
     outline: none;
 }
+
 textarea{ resize: none; }
 
 .Grid2{
@@ -312,6 +417,7 @@ textarea{ resize: none; }
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
+
 @media (max-width: 420px){
     .Grid2{ grid-template-columns: 1fr; }
 }
@@ -323,11 +429,13 @@ textarea{ resize: none; }
     display: grid;
     gap: 10px;
 }
+
 .CheckRow{
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
+
 .CheckPill{
     display: inline-flex;
     align-items: center;
@@ -344,6 +452,7 @@ textarea{ resize: none; }
     gap: 10px;
     align-items: center;
 }
+
 .Spacer{ flex: 1; }
 
 .Empty{
@@ -352,6 +461,7 @@ textarea{ resize: none; }
     color: rgba(235,235,255,.72);
     font-size: 13px;
 }
+
 .GroupTitle{
     margin: 8px 2px 0;
     padding: 8px 10px;
@@ -368,31 +478,12 @@ textarea{ resize: none; }
     display: grid;
     gap: 4px;
 }
+
 .HintBox strong{ font-family: var(--titleFont); font-size: 14px; }
 .HintBox small{ color: rgba(235,235,255,.72); }
 
-.DangerBtn{
-    background: rgba(234,0,217,.20);
-    border: 1px solid rgba(234,0,217,.34);
-    color: var(--lavender);
-    padding: 10px 12px;
-    border-radius: 999px;
-    box-shadow: 0 0 0 6px rgba(234,0,217,.06);
-}
-
-.DangerBtn:hover{
-    background: rgba(234,0,217,.28);
-    border-color: rgba(234,0,217,.48);
-}
-
-.DangerBtn:disabled{
-    opacity: .55;
-    cursor: not-allowed;
-    filter: saturate(.7);
-}
-
 /* -------------------------
-    Confirm Modal
+   Confirm Modal
 -------------------------- */
 
 .ModalOverlay{
@@ -436,7 +527,7 @@ textarea{ resize: none; }
     color: rgba(235,235,255,.82);
     font-size: 13px;
     line-height: 1.4;
-    white-space: pre-line; /* respeta saltos de línea */
+    white-space: pre-line;
 }
 
 .ModalFooter{
@@ -445,59 +536,4 @@ textarea{ resize: none; }
     gap: 10px;
     justify-content: flex-end;
     border-top: 1px solid rgba(235,235,255,.12);
-}
-
-/* Refuerza el look del DangerBtn para que no se vea tenue */
-.ModalFooter .DangerBtn{
-    background: rgba(234,0,217,.20);
-    border: 1px solid rgba(234,0,217,.34);
-    color: var(--lavender);
-    padding: 10px 12px;
-    border-radius: 999px;
-    box-shadow: 0 0 0 6px rgba(234,0,217,.06);
-}
-.ModalFooter .DangerBtn:hover{
-    background: rgba(234,0,217,.28);
-    border-color: rgba(234,0,217,.48);
-}
-.ModalFooter .DangerBtn:disabled{
-    opacity: .55;
-    cursor: not-allowed;
-    filter: saturate(.7);
-}
-
-.NotesMd{
-    display: block;
-    color: rgba(235,235,255,.74);
-    font-size: 12px;
-    line-height: 1.35;
-}
-
-.NotesMd a{
-    color: rgba(10,189,198,.85);
-    text-decoration: none;
-    border-bottom: 1px solid rgba(10,189,198,.35);
-}
-
-.NotesMd a:hover{
-    border-bottom-color: rgba(10,189,198,.70);
-}
-
-.NotesMd code{
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 10px;
-    border: 1px solid rgba(235,235,255,.16);
-    background: rgba(235,235,255,.05);
-    color: rgba(235,235,255,.88);
-}
-
-.NotesMd ul{
-    margin: 6px 0 0 18px;
-    padding: 0;
-}
-
-.NotesMd li{
-    margin: 2px 0;
 }

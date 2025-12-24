@@ -16,10 +16,10 @@
 <body>
     <header class="TopBar">
         <div class="Brand">
-            <div class="LogoMark" aria-hidden="true">AX</div>
+            <div class="LogoMark" aria-hidden="true">aX</div>
             <div class="BrandText">
                 <h1>AgendX</h1>
-                <p>Agenda por rangos, centrada en móvil</p>
+                <p>Agenda por rangos (mobile-first)</p>
             </div>
         </div>
 
@@ -39,119 +39,116 @@
             <div class="CardHeader">
                 <h2 id="ListTitle">Día</h2>
 
-            <div class="InlineControls">
-                <button class="GhostBtn" id="PrevBtn" type="button" aria-label="Anterior">‹</button>
-                <button class="GhostBtn" id="TodayBtn" type="button">Ir a hoy</button>
-                <button class="GhostBtn" id="NextBtn" type="button" aria-label="Siguiente">›</button>
-                <button class="PrimaryBtn" id="StartDayBtn" type="button">Iniciar día</button>
+                <div class="InlineControls">
+                    <button class="GhostBtn" id="PrevBtn" type="button" aria-label="Anterior">‹</button>
+                    <button class="GhostBtn" id="TodayBtn" type="button">Ir a hoy</button>
+                    <button class="GhostBtn" id="NextBtn" type="button" aria-label="Siguiente">›</button>
+                    <button class="PrimaryBtn" id="StartDayBtn" type="button">Iniciar día</button>
+                </div>
             </div>
-        </div>
 
-        <div class="List" id="OccurrenceList" aria-live="polite"></div>
+            <div class="List" id="OccurrenceList" aria-live="polite"></div>
+        </section>
+    </main>
+
+    <div class="Overlay" id="Overlay" hidden></div>
+
+    <section class="Sheet" id="EventSheet" hidden aria-modal="true" role="dialog" aria-labelledby="EventSheetTitle">
+        <header class="SheetHeader">
+            <h3 id="EventSheetTitle">Agregar evento</h3>
+            <button class="IconBtn" id="CloseEventSheetBtn" type="button" aria-label="Cerrar">✕</button>
+        </header>
+
+        <form class="SheetBody" id="EventForm">
+            <input type="hidden" id="EventId" />
+
+            <div class="Grid2">
+                <label class="Field">
+                    <span>Tipo</span>
+                    <select id="EventKind">
+                        <option value="event">Evento</option>
+                        <option value="rest">Descanso</option>
+                    </select>
+                </label>
+
+                <label class="Field">
+                    <span>Rango (prioridad)</span>
+                    <input id="RangeOrderInput" type="number" min="1" step="1" value="10" required />
+                </label>
+            </div>
+
+            <div id="TitleWrap">
+                <label class="Field">
+                    <span>Título</span>
+                    <input id="TitleInput" required maxlength="60" placeholder="Ej. Estudiar JavaScript" />
+                </label>
+            </div>
+
+            <label class="Field">
+                <span>Tiempo (min)</span>
+                <input id="DurationInput" type="number" min="0" step="5" placeholder="Ej. 45" />
+                <small>Se usa para el temporizador en tiempo real</small>
+            </label>
+
+            <div id="NotesWrap">
+                <label class="Field">
+                    <span>Notas (Markdown)</span>
+                    <textarea id="NotesInput" rows="2" maxlength="600" placeholder="- Lista&#10;**negrita**&#10;[link](https://...)"></textarea>
+                </label>
+            </div>
+
+            <div class="Grid2">
+                <label class="Field">
+                    <span>Repetición</span>
+                    <select id="RepeatType">
+                        <option value="none">Ninguna</option>
+                        <option value="daily">Diaria</option>
+                        <option value="weekly">Semanal</option>
+                        <option value="monthly">Mensual</option>
+                        <option value="interval">Cada N días</option>
+                        <option value="dates">Fechas específicas</option>
+                    </select>
+                </label>
+
+                <label class="Field">
+                    <span>Inicia desde</span>
+                    <input id="StartOnInput" type="date" />
+                </label>
+            </div>
+
+            <div class="RepeatConfig" id="RepeatConfig"></div>
+
+            <div class="HintBox">
+                <strong>Regla de Descanso</strong>
+                <small>Si existe un evento NO diario en el mismo rango, el “Descanso” se elimina automáticamente para ese día.</small>
+            </div>
+
+            <div class="SheetFooter">
+                <button class="DangerBtn" id="DeleteBtn" type="button" hidden>Eliminar</button>
+                <div class="Spacer"></div>
+                <button class="GhostBtn" id="CancelEventBtn" type="button">Cancelar</button>
+                <button class="PrimaryBtn" type="submit">Guardar</button>
+            </div>
+        </form>
     </section>
-</main>
-
-<div class="Overlay" id="Overlay" hidden></div>
-
-<section class="Sheet" id="EventSheet" hidden aria-modal="true" role="dialog" aria-labelledby="EventSheetTitle">
-    <header class="SheetHeader">
-        <h3 id="EventSheetTitle">Agregar evento</h3>
-        <button class="IconBtn" id="CloseEventSheetBtn" type="button" aria-label="Cerrar">✕</button>
-    </header>
-
-    <form class="SheetBody" id="EventForm">
-        <input type="hidden" id="EventId" />
-
-        <div class="Grid2">
-            <label class="Field">
-                <span>Tipo</span>
-                <select id="EventKind">
-                    <option value="event">Evento</option>
-                    <option value="rest">Descanso</option>
-                </select>
-            </label>
-
-            <label class="Field">
-                <span>Rango (prioridad)</span>
-                <input id="RangeOrderInput" type="number" min="1" step="1" value="10" required />
-            </label>
-        </div>
-
-        <div id="TitleWrap">
-            <label class="Field">
-                <span>Título</span>
-                <input id="TitleInput" required maxlength="60" placeholder="Ej. Estudiar JavaScript" />
-            </label>
-        </div>
-
-        <label class="Field">
-            <span>Tiempo (min)</span>
-            <input id="DurationInput" type="number" min="0" step="5" placeholder="Ej. 45" />
-            <small>Se usa para el temporizador en tiempo real</small>
-        </label>
-
-        <div id="NotesWrap">
-            <label class="Field">
-                <span>Notas</span>
-                <textarea id="NotesInput" rows="2" maxlength="180" placeholder="Opcional"></textarea>
-            </label>
-        </div>
-
-        <div class="Grid2">
-            <label class="Field">
-                <span>Repetición</span>
-                <select id="RepeatType">
-                    <option value="none">Ninguna</option>
-                    <option value="daily">Diaria</option>
-                    <option value="weekly">Semanal</option>
-                    <option value="monthly">Mensual</option>
-                    <option value="interval">Cada N días</option>
-                    <option value="dates">Fechas específicas</option>
-                </select>
-            </label>
-
-            <label class="Field">
-                <span>Inicia desde</span>
-                <input id="StartOnInput" type="date" />
-            </label>
-        </div>
-
-        <div class="RepeatConfig" id="RepeatConfig"></div>
-
-        <div class="HintBox">
-            <strong>Regla de Descanso</strong>
-            <small>Si existe un evento NO diario en el mismo rango, el “Descanso” de ese rango se elimina automáticamente para ese día.</small>
-        </div>
-
-        <div class="SheetFooter">
-            <button class="DangerBtn" id="DeleteBtn" type="button" hidden>Eliminar</button>
-            <div class="Spacer"></div>
-            <button class="GhostBtn" id="CancelEventBtn" type="button">Cancelar</button>
-            <button class="PrimaryBtn" type="submit">Guardar</button>
-        </div>
-    </form>
-</section>
 
     <!-- Confirm Modal -->
-<div class="ModalOverlay" id="ConfirmOverlay" hidden></div>
+    <div class="ModalOverlay" id="ConfirmOverlay" hidden></div>
 
-<section class="Modal" id="ConfirmModal" hidden role="dialog" aria-modal="true" aria-labelledby="ConfirmTitle">
-    <header class="ModalHeader">
-        <h3 id="ConfirmTitle">Confirmación</h3>
-        <button class="IconBtn" id="ConfirmCloseBtn" type="button" aria-label="Cerrar">✕</button>
-    </header>
+    <section class="Modal" id="ConfirmModal" hidden role="dialog" aria-modal="true" aria-labelledby="ConfirmTitle">
+        <header class="ModalHeader">
+            <h3 id="ConfirmTitle">Confirmación</h3>
+            <button class="IconBtn" id="ConfirmCloseBtn" type="button" aria-label="Cerrar">✕</button>
+        </header>
 
-    <div class="ModalBody" id="ConfirmBody">
-        ¿Seguro?
-    </div>
+        <div class="ModalBody" id="ConfirmBody">¿Seguro?</div>
 
-    <footer class="ModalFooter">
-        <button class="GhostBtn" id="ConfirmCancelBtn" type="button">Cancelar</button>
-        <button class="DangerBtn" id="ConfirmOkBtn" type="button">Finalizar día</button>
-    </footer>
-</section>
+        <footer class="ModalFooter">
+            <button class="GhostBtn" id="ConfirmCancelBtn" type="button">Cancelar</button>
+            <button class="DangerBtn" id="ConfirmOkBtn" type="button">Confirmar</button>
+        </footer>
+    </section>
 
-
-<script type="module" src="./js/App.js"></script>
+    <script type="module" src="./js/App.js"></script>
 </body>
 </html>
