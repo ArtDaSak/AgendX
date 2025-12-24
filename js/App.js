@@ -298,7 +298,7 @@ function rowHtml(occ) {
       <div class="RowTop">
         <div class="TitleLine">
           <strong>R${occ.rangeOrder} · ${escapeHtml(occ.title)}</strong>
-          <small>${escapeHtml(occ.notes || "")}</small>
+          <small class="NotesMd">${renderMarkdown(occ.notes || "")}</small>
         </div>
         <div class="Badges">
           <span class="Badge ${isRest ? "isWarn" : "isAccent"}">${repeatLabel}</span>
@@ -1210,4 +1210,59 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function renderMarkdown(md) {
+  const raw = String(md ?? "");
+  if (!raw.trim()) return "";
+
+  // 1) Escapa HTML primero (seguridad)
+  let s = escapeHtml(raw);
+
+  // 2) Links [text](https://...)
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, text, url) => {
+    const safeText = text;
+    const safeUrl = url;
+    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeText}</a>`;
+  });
+
+  // 3) Inline code `code`
+  s = s.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
+
+  // 4) Bold **text**
+  s = s.replace(/\*\*([^*]+)\*\*/g, (_m, bold) => `<strong>${bold}</strong>`);
+
+  // 5) Italic *text* (simple)
+  s = s.replace(/\*([^*]+)\*/g, (_m, it) => `<em>${it}</em>`);
+
+  // 6) Listas: agrupa líneas que empiezan por "- "
+  const lines = s.split("\n");
+  let out = [];
+  let inList = false;
+
+  for (const line of lines) {
+    const m = line.match(/^\s*-\s+(.*)$/);
+    if (m) {
+      if (!inList) {
+        out.push("<ul>");
+        inList = true;
+      }
+      out.push(`<li>${m[1]}</li>`);
+    } else {
+      if (inList) {
+        out.push("</ul>");
+        inList = false;
+      }
+      // Línea normal
+      out.push(line);
+    }
+  }
+  if (inList) out.push("</ul>");
+
+  s = out.join("\n");
+
+  // 7) Saltos de línea como <br>, excepto dentro de <ul> (queda ok igual)
+  s = s.replace(/\n/g, "<br>");
+
+  return s;
 }

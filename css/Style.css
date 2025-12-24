@@ -465,3 +465,39 @@ textarea{ resize: none; }
   cursor: not-allowed;
   filter: saturate(.7);
 }
+
+.NotesMd{
+  display: block;
+  color: rgba(235,235,255,.74);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.NotesMd a{
+  color: rgba(10,189,198,.85);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(10,189,198,.35);
+}
+
+.NotesMd a:hover{
+  border-bottom-color: rgba(10,189,198,.70);
+}
+
+.NotesMd code{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(235,235,255,.16);
+  background: rgba(235,235,255,.05);
+  color: rgba(235,235,255,.88);
+}
+
+.NotesMd ul{
+  margin: 6px 0 0 18px;
+  padding: 0;
+}
+
+.NotesMd li{
+  margin: 2px 0;
+}
