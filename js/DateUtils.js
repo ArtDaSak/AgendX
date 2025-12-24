@@ -1,5 +1,4 @@
 export const DateUtils = {
-  // Se convierte un Date a YYYY-MM-DD en horario local
   toLocalDateKey(date) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -7,13 +6,11 @@ export const DateUtils = {
     return `${y}-${m}-${d}`;
   },
 
-  // Se crea un Date local desde YYYY-MM-DD sin desfase UTC
   fromLocalDateKey(dateKey) {
     const [y, m, d] = dateKey.split("-").map(Number);
     return new Date(y, m - 1, d, 0, 0, 0, 0);
   },
 
-  // Se suma días manteniendo horario local
   addDays(date, days) {
     const copy = new Date(date);
     copy.setDate(copy.getDate() + days);
@@ -23,7 +20,7 @@ export const DateUtils = {
   startOfWeek(date) {
     const copy = new Date(date);
     const day = copy.getDay();
-    const diff = (day + 6) % 7; // Se asume semana inicia lunes
+    const diff = (day + 6) % 7; // Lunes
     copy.setDate(copy.getDate() - diff);
     copy.setHours(0, 0, 0, 0);
     return copy;
@@ -36,7 +33,6 @@ export const DateUtils = {
     return end;
   },
 
-  // Se redondea a la siguiente media hora
   roundToNextHalfHour(date) {
     const copy = new Date(date);
     const minutes = copy.getMinutes();

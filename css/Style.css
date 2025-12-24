@@ -9,17 +9,16 @@
 
   --bg: var(--prussian-blue);
   --panel: rgba(19, 62, 124, 0.20);
-  --panel2: rgba(19, 62, 124, 0.35);
   --text: var(--lavender);
-  --muted: rgba(235, 235, 255, 0.70);
-
+  --muted: rgba(235, 235, 255, 0.72);
   --stroke: rgba(235, 235, 255, 0.14);
   --shadow: 0 10px 30px rgba(0,0,0,.35);
 
   --radius: 18px;
   --radius2: 26px;
-
   --max: 560px;
+
+  --titleFont: "Iceland", ui-sans-serif, system-ui;
 }
 
 *{ box-sizing: border-box; }
@@ -31,6 +30,11 @@ body{
               radial-gradient(1000px 500px at 90% 10%, rgba(10,189,198,.18), transparent 55%),
               var(--bg);
   color: var(--text);
+}
+
+h1,h2,h3{
+  font-family: var(--titleFont);
+  letter-spacing: .8px;
 }
 
 .TopBar{
@@ -53,23 +57,32 @@ body{
   gap: 12px;
   min-width: 0;
 }
-.Brand h1{
-  font-size: 16px;
-  margin: 0;
-  letter-spacing: .2px;
+
+.LogoMark{
+  font-family: var(--titleFont);
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 1px;
+  color: var(--lavender);
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(234,0,217,.95), rgba(10,189,198,.75));
+  box-shadow: 0 0 0 6px rgba(234,0,217,.08);
+  border: 1px solid rgba(235,235,255,.18);
+  flex: 0 0 auto;
 }
-.Brand p{
+
+.BrandText h1{
+  font-size: 18px;
+  margin: 0;
+}
+.BrandText p{
   font-size: 12px;
   margin: 2px 0 0 0;
   color: var(--muted);
-}
-.LogoDot{
-  width: 14px;
-  height: 14px;
-  border-radius: 99px;
-  background: linear-gradient(135deg, var(--vivid-orchid), var(--strong-cyan));
-  box-shadow: 0 0 0 6px rgba(234,0,217,.08);
-  flex: 0 0 auto;
 }
 
 .Main{
@@ -91,7 +104,7 @@ body{
   color: var(--text);
   padding: 10px 12px;
   border-radius: 999px;
-  font-weight: 600;
+  font-weight: 800;
 }
 .TabBtn.isActive{
   background: linear-gradient(135deg, rgba(234,0,217,.26), rgba(10,189,198,.18));
@@ -115,12 +128,14 @@ body{
 }
 .CardHeader h2{
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
 }
 .InlineControls{
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .List{
@@ -178,6 +193,10 @@ body{
   border-color: rgba(10,189,198,.30);
   background: rgba(10,189,198,.12);
 }
+.Badge.isWarn{
+  border-color: rgba(235,235,255,.30);
+  background: rgba(235,235,255,.10);
+}
 
 .RowActions{
   display: flex;
@@ -188,7 +207,7 @@ body{
 button{
   cursor: pointer;
   border: 1px solid transparent;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .PrimaryBtn{
@@ -233,7 +252,8 @@ button{
   gap: 8px;
 }
 .ActiveSession strong{
-  font-size: 13px;
+  font-size: 14px;
+  font-family: var(--titleFont);
 }
 .ActiveSession small{
   color: var(--muted);
@@ -268,7 +288,8 @@ button{
 }
 .SheetHeader h3{
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
+  font-family: var(--titleFont);
 }
 .SheetBody{
   padding: 12px 14px 14px;
@@ -282,7 +303,7 @@ button{
 .Field span{
   font-size: 12px;
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 900;
 }
 .Field small{
   font-size: 11px;
@@ -314,6 +335,7 @@ textarea{ resize: none; }
   display: grid;
   gap: 10px;
 }
+
 .CheckRow{
   display: flex;
   flex-wrap: wrap;
@@ -329,6 +351,7 @@ textarea{ resize: none; }
   background: rgba(235,235,255,.04);
   font-size: 12px;
 }
+
 .SheetFooter{
   display: flex;
   gap: 10px;
@@ -348,4 +371,47 @@ textarea{ resize: none; }
   font-size: 12px;
   color: rgba(235,235,255,.75);
   border-left: 3px solid rgba(234,0,217,.45);
+}
+
+/* Start Day UI extras */
+.Segmented{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.SegBtn{
+  border: 1px solid var(--stroke);
+  background: rgba(235,235,255,.04);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-weight: 900;
+}
+.SegBtn.isActive{
+  background: linear-gradient(135deg, rgba(10,189,198,.20), rgba(234,0,217,.18));
+  border-color: rgba(10,189,198,.30);
+}
+
+.HintBox{
+  border: 1px solid rgba(235,235,255,.16);
+  background: rgba(235,235,255,.04);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+.HintBox strong{
+  font-family: var(--titleFont);
+  font-size: 14px;
+}
+.HintBox small{
+  color: rgba(235,235,255,.72);
+}
+
+.PillInfo{
+  border: 1px solid rgba(235,235,255,.16);
+  background: rgba(234,0,217,.10);
+  border-radius: 999px;
+  padding: 10px 12px;
+  font-size: 13px;
 }

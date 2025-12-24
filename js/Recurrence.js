@@ -1,7 +1,6 @@
 import { DateUtils } from "./DateUtils.js";
 
 export const Recurrence = {
-  // Se genera ocurrencias entre startDate y endDate (inclusive por día)
   buildOccurrences(events, startDate, endDate) {
     const startKey = DateUtils.toLocalDateKey(startDate);
     const endKey = DateUtils.toLocalDateKey(endDate);
@@ -28,8 +27,7 @@ export const Recurrence = {
             notes: event.notes ?? "",
             rangeOrder: Number(event.rangeOrder ?? 999),
             durationMin: event.durationMin ?? null,
-            repeat: event.repeat,
-            weekdayFilter: event.weekdayFilter ?? []
+            repeat: event.repeat ?? { type: "none" }
           });
         }
       }
@@ -44,7 +42,7 @@ export const Recurrence = {
   },
 
   matches(event, dayKey) {
-    // Se valida filtro opcional de días permitidos
+    // Se filtra por días permitidos (si existe)
     const weekdayFilter = Array.isArray(event.weekdayFilter) ? event.weekdayFilter : [];
     if (weekdayFilter.length > 0) {
       const weekday = DateUtils.fromLocalDateKey(dayKey).getDay(); // 0 dom - 6 sáb
@@ -53,13 +51,8 @@ export const Recurrence = {
 
     const type = event.repeat?.type ?? "none";
 
-    if (type === "none") {
-      return event.startOn === dayKey;
-    }
-
-    if (type === "daily") {
-      return true;
-    }
+    if (type === "none") return event.startOn === dayKey;
+    if (type === "daily") return true;
 
     if (type === "weekly") {
       const weekday = DateUtils.fromLocalDateKey(dayKey).getDay();

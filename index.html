@@ -5,16 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#091833" />
   <title>AgendX</title>
+
+  <!-- Fuente para títulos -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Iceland&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="./css/Style.css" />
 </head>
 
 <body>
   <header class="TopBar">
     <div class="Brand">
-      <div class="LogoDot" aria-hidden="true"></div>
-      <div>
+      <div class="LogoMark" aria-hidden="true">aX</div>
+      <div class="BrandText">
         <h1>AgendX</h1>
-        <p>Agenda por rangos, no por horas, empiezas cuando tu decides</p>
+        <p>Agenda por rangos, centrada en móvil</p>
       </div>
     </div>
 
@@ -25,18 +31,17 @@
 
   <main class="Main">
     <nav class="Tabs" aria-label="Vistas">
-      <button class="TabBtn isActive" data-view="today" type="button">Hoy</button>
+      <button class="TabBtn isActive" data-view="today" type="button">Día</button>
       <button class="TabBtn" data-view="week" type="button">Semana</button>
       <button class="TabBtn" data-view="all" type="button">Todo</button>
     </nav>
 
-    <section class="ActiveSession" id="ActiveSession">
-      <!-- Se renderiza la sesión activa -->
-    </section>
+    <section class="ActiveSession" id="ActiveSession"></section>
 
     <section class="Card" id="ListCard">
       <div class="CardHeader">
-        <h2 id="ListTitle">Hoy</h2>
+        <h2 id="ListTitle">Día</h2>
+
         <div class="InlineControls">
           <button class="GhostBtn" id="PrevBtn" type="button" aria-label="Anterior">‹</button>
           <button class="GhostBtn" id="TodayBtn" type="button">Ir a hoy</button>
@@ -45,19 +50,18 @@
         </div>
       </div>
 
-      <div class="List" id="OccurrenceList" aria-live="polite">
-        <!-- Se renderizan ocurrencias -->
-      </div>
+      <div class="List" id="OccurrenceList" aria-live="polite"></div>
     </section>
   </main>
 
-  <!-- Modal Bottom Sheet -->
+  <!-- Modal Overlay -->
   <div class="Overlay" id="Overlay" hidden></div>
 
-  <section class="Sheet" id="Sheet" hidden aria-modal="true" role="dialog" aria-labelledby="SheetTitle">
+  <!-- Bottom Sheet: Evento (crear/editar) -->
+  <section class="Sheet" id="EventSheet" hidden aria-modal="true" role="dialog" aria-labelledby="EventSheetTitle">
     <header class="SheetHeader">
-      <h3 id="SheetTitle">Agregar evento</h3>
-      <button class="IconBtn" id="CloseSheetBtn" type="button" aria-label="Cerrar">✕</button>
+      <h3 id="EventSheetTitle">Agregar evento</h3>
+      <button class="IconBtn" id="CloseEventSheetBtn" type="button" aria-label="Cerrar">✕</button>
     </header>
 
     <form class="SheetBody" id="EventForm">
@@ -69,13 +73,13 @@
       </label>
 
       <label class="Field">
-        <span>Rango (orden)</span>
+        <span>Rango (prioridad)</span>
         <input id="RangeOrderInput" type="number" min="1" step="1" value="10" required />
-        <small>Se usa para ordenar el día sin horarios</small>
+        <small>Orden del día sin horarios</small>
       </label>
 
       <label class="Field">
-        <span>Duración estimada (min)</span>
+        <span>Tiempo (min)</span>
         <input id="DurationInput" type="number" min="0" step="5" placeholder="Opcional" />
       </label>
 
@@ -103,15 +107,115 @@
         </label>
       </div>
 
-      <div class="RepeatConfig" id="RepeatConfig">
-        <!-- Se renderiza según el tipo -->
-      </div>
+      <div class="RepeatConfig" id="RepeatConfig"></div>
 
       <div class="SheetFooter">
         <button class="DangerBtn" id="DeleteBtn" type="button" hidden>Eliminar</button>
         <div class="Spacer"></div>
-        <button class="GhostBtn" id="CancelBtn" type="button">Cancelar</button>
+        <button class="GhostBtn" id="CancelEventBtn" type="button">Cancelar</button>
         <button class="PrimaryBtn" type="submit">Guardar</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Bottom Sheet: Iniciar Día (Evento rápido / Descanso) -->
+  <section class="Sheet" id="StartDaySheet" hidden aria-modal="true" role="dialog" aria-labelledby="StartDayTitle">
+    <header class="SheetHeader">
+      <h3 id="StartDayTitle">Iniciar día</h3>
+      <button class="IconBtn" id="CloseStartDaySheetBtn" type="button" aria-label="Cerrar">✕</button>
+    </header>
+
+    <form class="SheetBody" id="StartDayForm">
+      <div class="Segmented">
+        <button class="SegBtn isActive" type="button" data-seg="quick">Evento rápido</button>
+        <button class="SegBtn" type="button" data-seg="rest">Descanso</button>
+      </div>
+
+      <div class="HintBox">
+        <strong>Regla</strong>
+        <small>Si hay un evento NO diario en el mismo rango del día, cualquier “Descanso” en ese rango se elimina.</small>
+      </div>
+
+      <div id="QuickEventBlock">
+        <label class="Field">
+          <span>Título</span>
+          <input id="QuickTitle" maxlength="60" placeholder="Ej. Reunión" />
+        </label>
+
+        <div class="Grid2">
+          <label class="Field">
+            <span>Rango</span>
+            <input id="QuickRange" type="number" min="1" step="1" value="10" />
+          </label>
+
+          <label class="Field">
+            <span>Tiempo (min)</span>
+            <input id="QuickDuration" type="number" min="0" step="5" placeholder="Opcional" />
+          </label>
+        </div>
+
+        <div class="Grid2">
+          <label class="Field">
+            <span>Repetición</span>
+            <select id="QuickRepeatType">
+              <option value="none">Solo hoy</option>
+              <option value="daily">Diaria</option>
+              <option value="weekly">Semanal</option>
+              <option value="monthly">Mensual</option>
+              <option value="interval">Cada N días</option>
+              <option value="dates">Fechas específicas</option>
+            </select>
+          </label>
+
+          <label class="Field">
+            <span>Inicia desde</span>
+            <input id="QuickStartOn" type="date" />
+          </label>
+        </div>
+
+        <div class="RepeatConfig" id="QuickRepeatConfig"></div>
+      </div>
+
+      <div id="RestBlock" hidden>
+        <div class="PillInfo">Título fijo: <strong>Descanso</strong></div>
+
+        <div class="Grid2">
+          <label class="Field">
+            <span>Rango</span>
+            <input id="RestRange" type="number" min="1" step="1" value="10" />
+          </label>
+
+          <label class="Field">
+            <span>Tiempo (min)</span>
+            <input id="RestDuration" type="number" min="0" step="5" value="30" />
+          </label>
+        </div>
+
+        <div class="Grid2">
+          <label class="Field">
+            <span>Repetición</span>
+            <select id="RestRepeatType">
+              <option value="none">Solo hoy</option>
+              <option value="daily">Diaria</option>
+              <option value="weekly">Semanal</option>
+              <option value="monthly">Mensual</option>
+              <option value="interval">Cada N días</option>
+              <option value="dates">Fechas específicas</option>
+            </select>
+          </label>
+
+          <label class="Field">
+            <span>Inicia desde</span>
+            <input id="RestStartOn" type="date" />
+          </label>
+        </div>
+
+        <div class="RepeatConfig" id="RestRepeatConfig"></div>
+      </div>
+
+      <div class="SheetFooter">
+        <button class="GhostBtn" id="CancelStartDayBtn" type="button">Cancelar</button>
+        <button class="PrimaryBtn" id="ConfirmStartDayBtn" type="submit">Iniciar</button>
       </div>
     </form>
   </section>
