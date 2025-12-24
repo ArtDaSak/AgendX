@@ -7,6 +7,7 @@ export const Storage = {
       if (!raw) return { events: [], activeSession: null };
       const parsed = JSON.parse(raw);
 
+      if (!("activeDaySession" in parsed)) parsed.activeDaySession = null;
       // Se asegura forma mínima
       return {
         events: Array.isArray(parsed.events) ? parsed.events : [],

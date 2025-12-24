@@ -16,6 +16,7 @@ const Dom = {
   PrevBtn: document.getElementById("PrevBtn"),
   NextBtn: document.getElementById("NextBtn"),
   TodayBtn: document.getElementById("TodayBtn"),
+  StartDayBtn: document.getElementById("StartDayBtn"),
 
   OpenCreateBtn: document.getElementById("OpenCreateBtn"),
   Overlay: document.getElementById("Overlay"),
@@ -39,9 +40,11 @@ const Dom = {
 boot();
 
 function boot() {
-  // Se setea fecha ancla a hoy en local
   AppState.anchorDate = new Date();
   AppState.anchorDate.setSeconds(0, 0);
+
+  // Se asegura esquema para sesión del día
+  if (!("activeDaySession" in AppState.data)) AppState.data.activeDaySession = null;
 
   wireEvents();
   render();
@@ -57,16 +60,14 @@ function wireEvents() {
     });
   });
 
-  Dom.PrevBtn.addEventListener("click", () => {
-    shiftAnchor(-1);
-  });
-  Dom.NextBtn.addEventListener("click", () => {
-    shiftAnchor(1);
-  });
+  Dom.PrevBtn.addEventListener("click", () => shiftAnchor(-1));
+  Dom.NextBtn.addEventListener("click", () => shiftAnchor(1));
   Dom.TodayBtn.addEventListener("click", () => {
     AppState.anchorDate = new Date();
     render();
   });
+
+  Dom.StartDayBtn?.addEventListener("click", () => toggleDaySession());
 
   Dom.OpenCreateBtn.addEventListener("click", () => openSheetForCreate());
   Dom.CloseSheetBtn.addEventListener("click", closeSheet);
@@ -79,35 +80,35 @@ function wireEvents() {
   Dom.DeleteBtn.addEventListener("click", () => {
     const id = Dom.EventId.value;
     if (!id) return;
+
     AppState.data.events = AppState.data.events.filter(e => e.id !== id);
 
-    if (AppState.data.activeSession?.eventId === id) {
-      AppState.data.activeSession = null;
-    }
-
+    // Se limpia sesión si el día activo dependía de ocurrencias borradas (se recalcula luego)
     persistAndRender();
     closeSheet();
   });
 }
 
 function shiftAnchor(direction) {
-  if (AppState.view === "today") {
-    AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction);
-  } else if (AppState.view === "week") {
-    AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 7);
-  } else {
-    AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 30);
-  }
+  if (AppState.view === "today") AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction);
+  else if (AppState.view === "week") AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 7);
+  else AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 30);
+
   render();
 }
 
 function render() {
-  renderActiveSession();
+  renderActiveDaySession();
 
   const { rangeStart, rangeEnd, title } = computeRange();
   Dom.ListTitle.textContent = title;
 
-  const occurrences = Recurrence.buildOccurrences(AppState.data.events, rangeStart, rangeEnd);
+  let occurrences = Recurrence.buildOccurrences(AppState.data.events, rangeStart, rangeEnd);
+
+  // Regla: Semana no muestra "Daily"
+  if (AppState.view === "week") {
+    occurrences = occurrences.filter(o => (o.repeat?.type ?? "none") !== "daily");
+  }
 
   if (occurrences.length === 0) {
     Dom.OccurrenceList.innerHTML = `<div class="Empty">No hay eventos en este rango</div>`;
@@ -115,9 +116,7 @@ function render() {
   }
 
   Dom.OccurrenceList.innerHTML = renderOccurrences(occurrences, AppState.view);
-  Dom.OccurrenceList.querySelectorAll("[data-action]").forEach(btn => {
-    btn.addEventListener("click", onActionClick);
-  });
+
   Dom.OccurrenceList.querySelectorAll("[data-edit]").forEach(btn => {
     btn.addEventListener("click", () => {
       const eventId = btn.dataset.edit;
@@ -129,13 +128,13 @@ function render() {
 
 function computeRange() {
   const anchor = new Date(AppState.anchorDate);
-  anchor.setHours(0,0,0,0);
+  anchor.setHours(0, 0, 0, 0);
 
   if (AppState.view === "today") {
     const start = new Date(anchor);
     const end = new Date(anchor);
-    end.setHours(23,59,59,999);
-    return { rangeStart: start, rangeEnd: end, title: `Hoy · ${DateUtils.formatHumanDate(anchor)}` };
+    end.setHours(23, 59, 59, 999);
+    return { rangeStart: start, rangeEnd: end, title: `Día · ${DateUtils.formatHumanDate(anchor)}` };
   }
 
   if (AppState.view === "week") {
@@ -144,19 +143,15 @@ function computeRange() {
     return { rangeStart: start, rangeEnd: end, title: `Semana · ${DateUtils.formatHumanDate(start)} → ${DateUtils.formatHumanDate(end)}` };
   }
 
-  // Se muestra un rango amplio para "Todo" sin complicarse
   const start = DateUtils.addDays(anchor, -14);
   const end = DateUtils.addDays(anchor, 30);
-  end.setHours(23,59,59,999);
+  end.setHours(23, 59, 59, 999);
   return { rangeStart: start, rangeEnd: end, title: `Todo · ${DateUtils.formatHumanDate(start)} → ${DateUtils.formatHumanDate(end)}` };
 }
 
 function renderOccurrences(occurrences, view) {
-  let html = "";
-
   if (view === "today") {
-    for (const occ of occurrences) html += rowHtml(occ);
-    return html;
+    return occurrences.map(rowHtml).join("");
   }
 
   // Se agrupa por día
@@ -166,10 +161,11 @@ function renderOccurrences(occurrences, view) {
     byDay.get(occ.dayKey).push(occ);
   }
 
+  let html = "";
   for (const [dayKey, list] of byDay.entries()) {
     const day = DateUtils.fromLocalDateKey(dayKey);
     html += `<div class="GroupTitle">${DateUtils.formatHumanDate(day)}</div>`;
-    for (const occ of list) html += rowHtml(occ);
+    html += list.map(rowHtml).join("");
   }
 
   return html;
@@ -178,7 +174,7 @@ function renderOccurrences(occurrences, view) {
 function rowHtml(occ) {
   const repeatLabel = repeatToLabel(occ.repeat?.type ?? "none");
   const duration = occ.durationMin ? `· ${occ.durationMin} min` : "";
-  const isActive = AppState.data.activeSession?.occurrenceId === occ.occurrenceId;
+  const dayActive = isDayActiveFor(occ.dayKey);
 
   return `
     <article class="Row">
@@ -190,26 +186,24 @@ function rowHtml(occ) {
         <div class="Badges">
           <span class="Badge isAccent">${repeatLabel}</span>
           ${occ.durationMin ? `<span class="Badge isCyan">${occ.durationMin} min</span>` : ""}
-          ${isActive ? `<span class="Badge">En curso</span>` : ""}
+          ${dayActive ? `<span class="Badge">Día en curso</span>` : ""}
         </div>
       </div>
 
       <div class="RowActions">
         <button class="GhostBtn" type="button" data-edit="${occ.eventId}">Editar</button>
-        <button class="PrimaryBtn" type="button" data-action="${isActive ? "stop" : "start"}" data-occ="${occ.occurrenceId}">
-          ${isActive ? "Finalizar" : "Iniciar"}
-        </button>
       </div>
     </article>
   `;
 }
 
-function renderActiveSession() {
-  const session = AppState.data.activeSession;
+function renderActiveDaySession() {
+  const session = AppState.data.activeDaySession;
 
   if (!session) {
     Dom.ActiveSession.classList.remove("isVisible");
     Dom.ActiveSession.innerHTML = "";
+    if (Dom.StartDayBtn) Dom.StartDayBtn.textContent = "Iniciar día";
     return;
   }
 
@@ -218,50 +212,45 @@ function renderActiveSession() {
 
   Dom.ActiveSession.classList.add("isVisible");
   Dom.ActiveSession.innerHTML = `
-    <strong>Sesión activa</strong>
-    <small>${escapeHtml(session.title)} · Inicio ${time} (redondeado)</small>
+    <strong>Día iniciado</strong>
+    <small>${escapeHtml(session.dayKey)} · Inicio ${time} (redondeado) · ${session.occurrenceIds.length} eventos</small>
   `;
+
+  if (Dom.StartDayBtn) Dom.StartDayBtn.textContent = "Finalizar día";
 }
 
-function onActionClick(e) {
-  const btn = e.currentTarget;
-  const action = btn.dataset.action;
-  const occId = btn.dataset.occ;
+function toggleDaySession() {
+  const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
 
-  const occ = findOccurrenceById(occId);
-  if (!occ) return;
-
-  if (action === "start") {
-    startSession(occ);
-  } else {
-    stopSession();
+  // Si ya está activo ese mismo día, se finaliza
+  if (AppState.data.activeDaySession?.dayKey === dayKey) {
+    AppState.data.activeDaySession = null;
+    persistAndRender();
+    return;
   }
-}
 
-function findOccurrenceById(occurrenceId) {
-  const { rangeStart, rangeEnd } = computeRange();
-  const occurrences = Recurrence.buildOccurrences(AppState.data.events, rangeStart, rangeEnd);
-  return occurrences.find(x => x.occurrenceId === occurrenceId) ?? null;
-}
+  // Se inicia el día para el dayKey anclado (solo ocurrencias de ese día)
+  const dayStart = DateUtils.fromLocalDateKey(dayKey);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setHours(23, 59, 59, 999);
 
-function startSession(occ) {
+  // Para “día”: incluye TODO (incluye daily)
+  const dayOccurrences = Recurrence.buildOccurrences(AppState.data.events, dayStart, dayEnd);
+
   const now = new Date();
   const rounded = DateUtils.roundToNextHalfHour(now);
 
-  AppState.data.activeSession = {
-    occurrenceId: occ.occurrenceId,
-    eventId: occ.eventId,
-    dayKey: occ.dayKey,
-    title: occ.title,
-    startedAtIso: rounded.toISOString()
+  AppState.data.activeDaySession = {
+    dayKey,
+    startedAtIso: rounded.toISOString(),
+    occurrenceIds: dayOccurrences.map(o => o.occurrenceId)
   };
 
   persistAndRender();
 }
 
-function stopSession() {
-  AppState.data.activeSession = null;
-  persistAndRender();
+function isDayActiveFor(dayKey) {
+  return AppState.data.activeDaySession?.dayKey === dayKey;
 }
 
 function persistAndRender() {
@@ -279,7 +268,6 @@ function openSheetForCreate() {
   Dom.DurationInput.value = "";
   Dom.NotesInput.value = "";
   Dom.RepeatType.value = "none";
-
   Dom.StartOnInput.value = DateUtils.toLocalDateKey(new Date());
 
   renderRepeatConfig();
@@ -315,35 +303,51 @@ function closeSheet() {
 function renderRepeatConfig(event = null) {
   const type = Dom.RepeatType.value;
 
+  // Selector extra: días permitidos (uno o varios)
+  const selectedWeekdays = new Set(event?.weekdayFilter ?? []);
+  const weekdaysBlock = `
+    <div class="Field">
+      <span>Días permitidos (opcional)</span>
+      <div class="CheckRow">
+        ${weekdayPill(1, "Lun", selectedWeekdays, "AllowedWeekday")}
+        ${weekdayPill(2, "Mar", selectedWeekdays, "AllowedWeekday")}
+        ${weekdayPill(3, "Mié", selectedWeekdays, "AllowedWeekday")}
+        ${weekdayPill(4, "Jue", selectedWeekdays, "AllowedWeekday")}
+        ${weekdayPill(5, "Vie", selectedWeekdays, "AllowedWeekday")}
+        ${weekdayPill(6, "Sáb", selectedWeekdays, "AllowedWeekday")}
+        ${weekdayPill(0, "Dom", selectedWeekdays, "AllowedWeekday")}
+      </div>
+      <small>Si eliges días, el evento solo ocurre en esos días (aplica a cualquier repetición)</small>
+    </div>
+  `;
+
   if (type === "weekly") {
     const selected = new Set(event?.repeat?.daysOfWeek ?? []);
     Dom.RepeatConfig.innerHTML = `
+      ${weekdaysBlock}
       <div class="Field">
-        <span>Días de la semana</span>
+        <span>Días de repetición semanal</span>
         <div class="CheckRow">
-          ${weekPill(1, "Lun", selected)}
-          ${weekPill(2, "Mar", selected)}
-          ${weekPill(3, "Mié", selected)}
-          ${weekPill(4, "Jue", selected)}
-          ${weekPill(5, "Vie", selected)}
-          ${weekPill(6, "Sáb", selected)}
-          ${weekPill(0, "Dom", selected)}
+          ${weekdayPill(1, "Lun", selected, "WeeklyDay")}
+          ${weekdayPill(2, "Mar", selected, "WeeklyDay")}
+          ${weekdayPill(3, "Mié", selected, "WeeklyDay")}
+          ${weekdayPill(4, "Jue", selected, "WeeklyDay")}
+          ${weekdayPill(5, "Vie", selected, "WeeklyDay")}
+          ${weekdayPill(6, "Sáb", selected, "WeeklyDay")}
+          ${weekdayPill(0, "Dom", selected, "WeeklyDay")}
         </div>
       </div>
     `;
-    Dom.RepeatConfig.querySelectorAll("input[type=checkbox]").forEach(cb => {
-      cb.addEventListener("change", () => {});
-    });
     return;
   }
 
   if (type === "monthly") {
     const dayOfMonth = event?.repeat?.dayOfMonth ?? new Date().getDate();
     Dom.RepeatConfig.innerHTML = `
+      ${weekdaysBlock}
       <label class="Field">
         <span>Día del mes</span>
         <input id="DayOfMonthInput" type="number" min="1" max="31" value="${dayOfMonth}" />
-        <small>Ej. 15 para repetir cada 15</small>
       </label>
     `;
     return;
@@ -352,6 +356,7 @@ function renderRepeatConfig(event = null) {
   if (type === "interval") {
     const everyDays = event?.repeat?.everyDays ?? 2;
     Dom.RepeatConfig.innerHTML = `
+      ${weekdaysBlock}
       <label class="Field">
         <span>Cada N días</span>
         <input id="EveryDaysInput" type="number" min="1" step="1" value="${everyDays}" />
@@ -363,23 +368,28 @@ function renderRepeatConfig(event = null) {
   if (type === "dates") {
     const dateList = (event?.repeat?.dateList ?? []).join(", ");
     Dom.RepeatConfig.innerHTML = `
+      ${weekdaysBlock}
       <label class="Field">
         <span>Fechas (YYYY-MM-DD separadas por coma)</span>
         <input id="DateListInput" placeholder="2025-12-24, 2025-12-31" value="${dateList}" />
-        <small>Se aceptan espacios y se ignoran vacíos</small>
       </label>
     `;
     return;
   }
 
-  Dom.RepeatConfig.innerHTML = `<div class="Empty">Sin configuración adicional</div>`;
+  if (type === "daily") {
+    Dom.RepeatConfig.innerHTML = `${weekdaysBlock}`;
+    return;
+  }
+
+  Dom.RepeatConfig.innerHTML = `${weekdaysBlock}<div class="Empty">Sin configuración adicional</div>`;
 }
 
-function weekPill(value, label, selectedSet) {
+function weekdayPill(value, label, selectedSet, name) {
   const checked = selectedSet.has(value) ? "checked" : "";
   return `
     <label class="CheckPill">
-      <input type="checkbox" value="${value}" ${checked} />
+      <input type="checkbox" name="${name}" value="${value}" ${checked} />
       <span>${label}</span>
     </label>
   `;
@@ -398,6 +408,10 @@ function onSubmitEvent(e) {
   const startOn = Dom.StartOnInput.value || DateUtils.toLocalDateKey(new Date());
   const type = Dom.RepeatType.value;
 
+  const weekdayFilter = Array.from(Dom.RepeatConfig.querySelectorAll('input[name="AllowedWeekday"]'))
+    .filter(x => x.checked)
+    .map(x => Number(x.value));
+
   const repeat = buildRepeat(type);
 
   const payload = {
@@ -407,6 +421,7 @@ function onSubmitEvent(e) {
     durationMin,
     notes,
     startOn,
+    weekdayFilter,
     repeat
   };
 
@@ -420,16 +435,11 @@ function onSubmitEvent(e) {
 }
 
 function buildRepeat(type) {
-  if (type === "none") {
-    return { type: "none" };
-  }
-
-  if (type === "daily") {
-    return { type: "daily" };
-  }
+  if (type === "none") return { type: "none" };
+  if (type === "daily") return { type: "daily" };
 
   if (type === "weekly") {
-    const daysOfWeek = Array.from(Dom.RepeatConfig.querySelectorAll("input[type=checkbox]"))
+    const daysOfWeek = Array.from(Dom.RepeatConfig.querySelectorAll('input[name="WeeklyDay"]'))
       .filter(x => x.checked)
       .map(x => Number(x.value));
     return { type: "weekly", daysOfWeek };

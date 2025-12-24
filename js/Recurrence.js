@@ -1,7 +1,7 @@
 import { DateUtils } from "./DateUtils.js";
 
 export const Recurrence = {
-  // Se genera ocurrencias entre startDate y endDate
+  // Se genera ocurrencias entre startDate y endDate (inclusive por día)
   buildOccurrences(events, startDate, endDate) {
     const startKey = DateUtils.toLocalDateKey(startDate);
     const endKey = DateUtils.toLocalDateKey(endDate);
@@ -28,13 +28,13 @@ export const Recurrence = {
             notes: event.notes ?? "",
             rangeOrder: Number(event.rangeOrder ?? 999),
             durationMin: event.durationMin ?? null,
-            repeat: event.repeat
+            repeat: event.repeat,
+            weekdayFilter: event.weekdayFilter ?? []
           });
         }
       }
     }
 
-    // Se ordena por día y por rango
     occurrences.sort((a, b) => {
       if (a.dayKey !== b.dayKey) return a.dayKey.localeCompare(b.dayKey);
       return a.rangeOrder - b.rangeOrder;
@@ -44,6 +44,13 @@ export const Recurrence = {
   },
 
   matches(event, dayKey) {
+    // Se valida filtro opcional de días permitidos
+    const weekdayFilter = Array.isArray(event.weekdayFilter) ? event.weekdayFilter : [];
+    if (weekdayFilter.length > 0) {
+      const weekday = DateUtils.fromLocalDateKey(dayKey).getDay(); // 0 dom - 6 sáb
+      if (!weekdayFilter.includes(weekday)) return false;
+    }
+
     const type = event.repeat?.type ?? "none";
 
     if (type === "none") {
@@ -55,9 +62,9 @@ export const Recurrence = {
     }
 
     if (type === "weekly") {
-      const d = DateUtils.fromLocalDateKey(dayKey).getDay(); // 0 dom - 6 sáb
+      const weekday = DateUtils.fromLocalDateKey(dayKey).getDay();
       const daysOfWeek = event.repeat?.daysOfWeek ?? [];
-      return daysOfWeek.includes(d);
+      return daysOfWeek.includes(weekday);
     }
 
     if (type === "monthly") {
