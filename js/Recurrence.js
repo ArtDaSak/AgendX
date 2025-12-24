@@ -22,7 +22,7 @@ export const Recurrence = {
 
                 if (this.matches(event, dayKey)) {
                     const rangeOrder = Number(event.rangeOrder ?? 999);
-                    const occurrenceId = `${eventId}__${dayKey}__R${rangeOrder}`;
+                    const occurrenceId = `${eventId}__${dayKey}`;
 
                     occurrences.push({
                         occurrenceId,

@@ -537,3 +537,30 @@ textarea{ resize: none; }
     justify-content: flex-end;
     border-top: 1px solid rgba(235,235,255,.12);
 }
+
+.DragHandle{
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: 1px solid rgba(235,235,255,.16);
+    background: rgba(235,235,255,.05);
+    color: rgba(235,235,255,.86);
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    user-select: none;
+    touch-action: none; /* ✅ clave para drag en móvil */
+}
+
+.Row.isDragging{
+    opacity: .85;
+    transform: scale(0.995);
+    border-color: rgba(234,0,217,.40);
+    box-shadow: 0 0 0 6px rgba(234,0,217,.08);
+}
+
+.RowPlaceholder{
+    border: 1px dashed rgba(235,235,255,.22);
+    background: rgba(235,235,255,.03);
+    border-radius: var(--radius);
+}

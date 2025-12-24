@@ -66,6 +66,153 @@ async function boot() {
     AppState.anchorDate.setSeconds(0, 0);
 
     wireUi();
+    enableSortableIfNeeded();
+
+const SortState = {
+    dragging: false,
+    pointerId: null,
+    draggedEl: null,
+    placeholderEl: null,
+    startParent: null,
+    startNextSibling: null,
+    shiftY: 0,
+    widthPx: 0,
+    leftPx: 0
+};
+
+function enableSortableIfNeeded() {
+    Dom.OccurrenceList.addEventListener("pointerdown", onPointerDownSort, { passive: false });
+}
+
+function onPointerDownSort(e) {
+    const handle = e.target.closest("[data-drag-handle]");
+    if (!handle) return;
+
+    if (AppState.view !== "today") return;
+    if (AppState.isSaving) return;
+
+    const row = handle.closest(".Row");
+    if (!row) return;
+
+    e.preventDefault();
+
+    const rect = row.getBoundingClientRect();
+
+    SortState.dragging = true;
+    SortState.pointerId = e.pointerId;
+    SortState.draggedEl = row;
+
+    SortState.startParent = row.parentNode;
+    SortState.startNextSibling = row.nextSibling;
+
+    SortState.shiftY = e.clientY - rect.top;
+    SortState.widthPx = rect.width;
+    SortState.leftPx = rect.left;
+
+    // Placeholder con el mismo alto
+    const ph = document.createElement("div");
+    ph.className = "RowPlaceholder";
+    ph.style.height = `${rect.height}px`;
+    SortState.placeholderEl = ph;
+
+    // Inserta placeholder donde estaba el row
+    SortState.startParent.insertBefore(ph, row);
+
+    // “Despega” el row y lo mueve a fixed sobre la pantalla
+    row.classList.add("isDragging");
+    row.style.width = `${SortState.widthPx}px`;
+    row.style.position = "fixed";
+    row.style.left = `${SortState.leftPx}px`;
+    row.style.top = `${rect.top}px`;
+    row.style.zIndex = "9999";
+    row.style.pointerEvents = "none";
+
+    // Lo ponemos al final del body para que fixed sea confiable
+    document.body.appendChild(row);
+
+    row.setPointerCapture(e.pointerId);
+
+    window.addEventListener("pointermove", onPointerMoveSort, { passive: false });
+    window.addEventListener("pointerup", onPointerUpSort, { passive: false });
+}
+
+function onPointerMoveSort(e) {
+    if (!SortState.dragging) return;
+    if (e.pointerId !== SortState.pointerId) return;
+
+    e.preventDefault();
+
+    const row = SortState.draggedEl;
+    const ph = SortState.placeholderEl;
+    if (!row || !ph) return;
+
+    // Mueve el row con fixed siguiendo el dedo
+    const top = e.clientY - SortState.shiftY;
+    row.style.top = `${top}px`;
+
+    // Encuentra el row bajo el pointer (si existe)
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const targetRow = el ? el.closest(".Row") : null;
+
+    if (!targetRow) return;
+
+    // No reinsertar contra sí mismo (que está fuera del DOM de la lista)
+    if (!SortState.startParent.contains(targetRow)) return;
+
+    const r = targetRow.getBoundingClientRect();
+    const mid = r.top + r.height / 2;
+
+    // Inserta placeholder antes o después según el Y
+    if (e.clientY < mid) {
+        if (targetRow.previousSibling !== ph) {
+            SortState.startParent.insertBefore(ph, targetRow);
+        }
+    } else {
+        if (targetRow.nextSibling !== ph) {
+            SortState.startParent.insertBefore(ph, targetRow.nextSibling);
+        }
+    }
+}
+
+async function onPointerUpSort(e) {
+    if (!SortState.dragging) return;
+    if (e.pointerId !== SortState.pointerId) return;
+
+    e.preventDefault();
+
+    window.removeEventListener("pointermove", onPointerMoveSort);
+    window.removeEventListener("pointerup", onPointerUpSort);
+
+    const row = SortState.draggedEl;
+    const ph = SortState.placeholderEl;
+    const parent = SortState.startParent;
+
+    SortState.dragging = false;
+    SortState.pointerId = null;
+
+    if (!row || !ph || !parent) return;
+
+    // Devuelve el row al DOM en la posición del placeholder
+    row.classList.remove("isDragging");
+    row.style.position = "";
+    row.style.left = "";
+    row.style.top = "";
+    row.style.width = "";
+    row.style.zIndex = "";
+    row.style.pointerEvents = "";
+
+    parent.insertBefore(row, ph);
+    ph.remove();
+
+    SortState.draggedEl = null;
+    SortState.placeholderEl = null;
+    SortState.startParent = null;
+    SortState.startNextSibling = null;
+
+    // Persistir nuevo orden
+    await persistTodayOrderFromDom();
+}
+
     renderLoading();
 
     try {
@@ -363,12 +510,16 @@ function rowHtml(occ, currentOccId) {
     const isCurrent = currentOccId && occ.occurrenceId === currentOccId ? "isCurrent" : "";
 
     return `
-        <article class="Row ${isCurrent}">
+        <article class="Row ${isCurrent}" data-occ-id="${occ.occurrenceId}" data-event-id="${occ.eventId}">
             <div class="RowTop">
-                <div class="TitleLine">
-                    <strong>R${occ.rangeOrder} · ${escapeHtml(occ.title)}</strong>
-                    ${notesHtml}
+                <div style="display:flex; gap:10px; align-items:flex-start;">
+                    ${AppState.view === "today" ? `<div class="DragHandle" data-drag-handle="true" aria-label="Reordenar">≡</div>` : ""}
+                    <div class="TitleLine">
+                        <strong>R${occ.rangeOrder} · ${escapeHtml(occ.title)}</strong>
+                        ${notesHtml}
+                    </div>
                 </div>
+
                 <div class="Badges">
                     <span class="Badge ${isRest ? "isWarn" : "isAccent"}">${repeatLabel}</span>
                     ${occ.durationMin ? `<span class="Badge isCyan">${occ.durationMin} min</span>` : ""}
@@ -382,6 +533,78 @@ function rowHtml(occ, currentOccId) {
             </div>
         </article>
     `;
+}
+
+/* -------------------------
+   Reordenar eventos
+-------------------------- */
+
+async function persistTodayOrderFromDom() {
+    if (AppState.view !== "today") return;
+    if (AppState.isSaving) return;
+
+    const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+
+    // Solo reordenamos el “día” actual visible
+    const rows = Array.from(Dom.OccurrenceList.querySelectorAll(".Row[data-event-id]"));
+    if (rows.length === 0) return;
+
+    // Construimos el nuevo orden secuencial 1..N
+    const nowIso = new Date().toISOString();
+
+    // Map para acceder rápido a los eventos
+    const eventsById = new Map(AppState.data.events.map(ev => [String(ev.id), ev]));
+
+    // Calcula payloads de actualización
+    const updates = [];
+    for (let i = 0; i < rows.length; i++) {
+        const eventId = rows[i].dataset.eventId;
+        const ev = eventsById.get(String(eventId));
+        if (!ev) continue;
+
+        const newOrder = i + 1;
+
+        // Si ya coincide, no lo actualizamos
+        if (Number(ev.rangeOrder) === newOrder) continue;
+
+        const merged = {
+            ...ev,
+            rangeOrder: newOrder,
+            updatedAt: nowIso
+        };
+
+        updates.push({ id: ev.id, payload: merged });
+    }
+
+    if (updates.length === 0) {
+        // No hubo cambios reales
+        render();
+        return;
+    }
+
+    AppState.isSaving = true;
+    render();
+
+    try {
+        // ✅ Persistencia (secuencial, MockAPI no soporta batch real)
+        for (const u of updates) {
+            const updated = await Api.updateEvent(u.id, u.payload);
+
+            const idx = AppState.data.events.findIndex(x => String(x.id) === String(u.id));
+            if (idx >= 0) AppState.data.events[idx] = updated;
+        }
+
+        // ✅ Si el día está iniciado, recalcula el plan respetando done (por occurrenceId estable)
+        await recalculateActiveDayIfNeeded();
+
+        showToastLikeNotice("Orden actualizado ✅");
+    } catch (err) {
+        console.error(err);
+        showToastLikeNotice("No se pudo guardar el nuevo orden en MockAPI.");
+    } finally {
+        AppState.isSaving = false;
+        render();
+    }
 }
 
 /* -------------------------
@@ -871,18 +1094,32 @@ async function hydrateFromApi() {
 
 function setActiveSessionFromRemote(remote) {
     const rawPlan = Array.isArray(remote.plan) ? remote.plan : [];
+    const oldDone = remote.doneByOccId ?? {};
 
-    rawPlan.sort((a, b) => {
-        const ra = Number(a.rangeOrder ?? 999);
-        const rb = Number(b.rangeOrder ?? 999);
-        if (ra !== rb) return ra - rb;
-        return String(a.eventId ?? "").localeCompare(String(b.eventId ?? ""));
+    const normalizedPlan = rawPlan.map(o => {
+        const eventId = String(o.eventId ?? o.id ?? "");
+        const dayKey = String(o.dayKey ?? remote.dayKey ?? "");
+        const stableId = `${eventId}__${dayKey}`;
+
+        return {
+            ...o,
+            eventId,
+            dayKey,
+            occurrenceId: stableId,
+            rangeOrder: Number(o.rangeOrder ?? 999)
+        };
     });
 
-    const doneByOccId = remote.doneByOccId ?? {};
-    const safeDone = {};
-    for (const o of rawPlan) {
-        safeDone[o.occurrenceId] = Boolean(doneByOccId[o.occurrenceId]);
+    normalizedPlan.sort((a, b) => {
+        if (a.rangeOrder !== b.rangeOrder) return a.rangeOrder - b.rangeOrder;
+        return String(a.eventId).localeCompare(String(b.eventId));
+    });
+
+    const newDone = {};
+    for (const o of normalizedPlan) {
+        // ✅ soporte de migración: si antes venía con "__R", intenta leer ese key viejo
+        const legacyKey = `${o.eventId}__${o.dayKey}__R${o.rangeOrder}`;
+        newDone[o.occurrenceId] = Boolean(oldDone[o.occurrenceId] ?? oldDone[legacyKey] ?? false);
     }
 
     AppState.data.activeDaySession = {
@@ -890,8 +1127,8 @@ function setActiveSessionFromRemote(remote) {
         dayKey: remote.dayKey,
         startedAtIso: remote.startedAtIso,
         keepUntil: remote.keepUntil ?? keepUntilIso(remote.dayKey),
-        plan: rawPlan,
-        doneByOccId: safeDone,
+        plan: normalizedPlan,
+        doneByOccId: newDone,
         currentIndex: Number(remote.currentIndex ?? 0)
     };
 }
