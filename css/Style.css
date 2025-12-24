@@ -1,0 +1,351 @@
+:root{
+  /* CSS HEX */
+  --lavender: #ebebff;
+  --velvet-orchid: #711c91;
+  --vivid-orchid: #ea00d9;
+  --strong-cyan: #0abdc6;
+  --regal-navy: #133e7c;
+  --prussian-blue: #091833;
+
+  --bg: var(--prussian-blue);
+  --panel: rgba(19, 62, 124, 0.20);
+  --panel2: rgba(19, 62, 124, 0.35);
+  --text: var(--lavender);
+  --muted: rgba(235, 235, 255, 0.70);
+
+  --stroke: rgba(235, 235, 255, 0.14);
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+
+  --radius: 18px;
+  --radius2: 26px;
+
+  --max: 560px;
+}
+
+*{ box-sizing: border-box; }
+html, body{ height: 100%; }
+body{
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background: radial-gradient(1200px 600px at 40% -20%, rgba(234,0,217,.22), transparent 55%),
+              radial-gradient(1000px 500px at 90% 10%, rgba(10,189,198,.18), transparent 55%),
+              var(--bg);
+  color: var(--text);
+}
+
+.TopBar{
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 16px 14px;
+  backdrop-filter: blur(10px);
+  background: rgba(9, 24, 51, 0.72);
+  border-bottom: 1px solid var(--stroke);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.Brand{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.Brand h1{
+  font-size: 16px;
+  margin: 0;
+  letter-spacing: .2px;
+}
+.Brand p{
+  font-size: 12px;
+  margin: 2px 0 0 0;
+  color: var(--muted);
+}
+.LogoDot{
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, var(--vivid-orchid), var(--strong-cyan));
+  box-shadow: 0 0 0 6px rgba(234,0,217,.08);
+  flex: 0 0 auto;
+}
+
+.Main{
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.Tabs{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.TabBtn{
+  border: 1px solid var(--stroke);
+  background: rgba(235,235,255,.04);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.TabBtn.isActive{
+  background: linear-gradient(135deg, rgba(234,0,217,.26), rgba(10,189,198,.18));
+  border-color: rgba(10,189,198,.30);
+}
+
+.Card{
+  border: 1px solid var(--stroke);
+  background: linear-gradient(180deg, rgba(19,62,124,.22), rgba(9,24,51,.18));
+  border-radius: var(--radius2);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.CardHeader{
+  padding: 14px 14px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--stroke);
+}
+.CardHeader h2{
+  margin: 0;
+  font-size: 15px;
+}
+.InlineControls{
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.List{
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.Row{
+  border: 1px solid var(--stroke);
+  background: rgba(235,235,255,.04);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+.RowTop{
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.TitleLine{
+  min-width: 0;
+}
+.TitleLine strong{
+  display: block;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.TitleLine small{
+  color: var(--muted);
+  font-size: 12px;
+}
+.Badges{
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.Badge{
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  color: var(--text);
+  background: rgba(19,62,124,.18);
+}
+.Badge.isAccent{
+  border-color: rgba(234,0,217,.30);
+  background: rgba(234,0,217,.12);
+}
+.Badge.isCyan{
+  border-color: rgba(10,189,198,.30);
+  background: rgba(10,189,198,.12);
+}
+
+.RowActions{
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+button{
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-weight: 700;
+}
+
+.PrimaryBtn{
+  background: linear-gradient(135deg, var(--vivid-orchid), var(--velvet-orchid));
+  color: var(--lavender);
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(235,235,255,.14);
+}
+.GhostBtn{
+  background: rgba(235,235,255,.04);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+}
+.IconBtn{
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(235,235,255,.04);
+  border: 1px solid var(--stroke);
+  color: var(--text);
+}
+.DangerBtn{
+  background: rgba(234,0,217,.14);
+  border: 1px solid rgba(234,0,217,.25);
+  color: var(--lavender);
+  padding: 10px 12px;
+  border-radius: 999px;
+}
+
+.ActiveSession{
+  border: 1px solid rgba(10,189,198,.25);
+  background: rgba(10,189,198,.10);
+  border-radius: var(--radius2);
+  padding: 12px 14px;
+  display: none;
+}
+.ActiveSession.isVisible{
+  display: grid;
+  gap: 8px;
+}
+.ActiveSession strong{
+  font-size: 13px;
+}
+.ActiveSession small{
+  color: var(--muted);
+}
+
+.Overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 50;
+}
+.Sheet{
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0 auto;
+  max-width: var(--max);
+  background: rgba(9, 24, 51, 0.92);
+  border: 1px solid var(--stroke);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  z-index: 60;
+  box-shadow: var(--shadow);
+}
+.SheetHeader{
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--stroke);
+}
+.SheetHeader h3{
+  margin: 0;
+  font-size: 14px;
+}
+.SheetBody{
+  padding: 12px 14px 14px;
+  display: grid;
+  gap: 12px;
+}
+.Field{
+  display: grid;
+  gap: 6px;
+}
+.Field span{
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.Field small{
+  font-size: 11px;
+  color: rgba(235,235,255,.62);
+}
+input, textarea, select{
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--stroke);
+  background: rgba(235,235,255,.03);
+  color: var(--text);
+  outline: none;
+}
+textarea{ resize: none; }
+.Grid2{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 420px){
+  .Grid2{ grid-template-columns: 1fr; }
+}
+
+.RepeatConfig{
+  border: 1px dashed rgba(235,235,255,.20);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+.CheckRow{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.CheckPill{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: rgba(235,235,255,.04);
+  font-size: 12px;
+}
+.SheetFooter{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.Spacer{ flex: 1; }
+
+.Empty{
+  text-align: center;
+  padding: 22px 10px;
+  color: rgba(235,235,255,.72);
+  font-size: 13px;
+}
+.GroupTitle{
+  margin: 8px 2px 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: rgba(235,235,255,.75);
+  border-left: 3px solid rgba(234,0,217,.45);
+}

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#091833" />
+  <title>AgendX</title>
+  <link rel="stylesheet" href="./css/Style.css" />
+</head>
+
+<body>
+  <header class="TopBar">
+    <div class="Brand">
+      <div class="LogoDot" aria-hidden="true"></div>
+      <div>
+        <h1>AgendX</h1>
+        <p>Agenda por rangos, no por horas</p>
+      </div>
+    </div>
+
+    <button class="PrimaryBtn" id="OpenCreateBtn" type="button">
+      + Agregar
+    </button>
+  </header>
+
+  <main class="Main">
+    <nav class="Tabs" aria-label="Vistas">
+      <button class="TabBtn isActive" data-view="today" type="button">Hoy</button>
+      <button class="TabBtn" data-view="week" type="button">Semana</button>
+      <button class="TabBtn" data-view="all" type="button">Todo</button>
+    </nav>
+
+    <section class="ActiveSession" id="ActiveSession">
+      <!-- Se renderiza la sesión activa -->
+    </section>
+
+    <section class="Card" id="ListCard">
+      <div class="CardHeader">
+        <h2 id="ListTitle">Hoy</h2>
+        <div class="InlineControls">
+          <button class="GhostBtn" id="PrevBtn" type="button" aria-label="Anterior">‹</button>
+          <button class="GhostBtn" id="TodayBtn" type="button">Ir a hoy</button>
+          <button class="GhostBtn" id="NextBtn" type="button" aria-label="Siguiente">›</button>
+        </div>
+      </div>
+
+      <div class="List" id="OccurrenceList" aria-live="polite">
+        <!-- Se renderizan ocurrencias -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Bottom Sheet -->
+  <div class="Overlay" id="Overlay" hidden></div>
+
+  <section class="Sheet" id="Sheet" hidden aria-modal="true" role="dialog" aria-labelledby="SheetTitle">
+    <header class="SheetHeader">
+      <h3 id="SheetTitle">Agregar evento</h3>
+      <button class="IconBtn" id="CloseSheetBtn" type="button" aria-label="Cerrar">✕</button>
+    </header>
+
+    <form class="SheetBody" id="EventForm">
+      <input type="hidden" id="EventId" />
+
+      <label class="Field">
+        <span>Título</span>
+        <input id="TitleInput" required maxlength="60" placeholder="Ej. Estudiar JavaScript" />
+      </label>
+
+      <label class="Field">
+        <span>Rango (orden)</span>
+        <input id="RangeOrderInput" type="number" min="1" step="1" value="10" required />
+        <small>Se usa para ordenar el día sin horarios</small>
+      </label>
+
+      <label class="Field">
+        <span>Duración estimada (min)</span>
+        <input id="DurationInput" type="number" min="0" step="5" placeholder="Opcional" />
+      </label>
+
+      <label class="Field">
+        <span>Notas</span>
+        <textarea id="NotesInput" rows="2" maxlength="180" placeholder="Opcional"></textarea>
+      </label>
+
+      <div class="Grid2">
+        <label class="Field">
+          <span>Repetición</span>
+          <select id="RepeatType">
+            <option value="none">Ninguna</option>
+            <option value="daily">Diaria</option>
+            <option value="weekly">Semanal</option>
+            <option value="monthly">Mensual</option>
+            <option value="interval">Cada N días</option>
+            <option value="dates">Fechas específicas</option>
+          </select>
+        </label>
+
+        <label class="Field">
+          <span>Inicia desde</span>
+          <input id="StartOnInput" type="date" />
+        </label>
+      </div>
+
+      <div class="RepeatConfig" id="RepeatConfig">
+        <!-- Se renderiza según el tipo -->
+      </div>
+
+      <div class="SheetFooter">
+        <button class="DangerBtn" id="DeleteBtn" type="button" hidden>Eliminar</button>
+        <div class="Spacer"></div>
+        <button class="GhostBtn" id="CancelBtn" type="button">Cancelar</button>
+        <button class="PrimaryBtn" type="submit">Guardar</button>
+      </div>
+    </form>
+  </section>
+
+  <script type="module" src="./js/App.js"></script>
+</body>
+</html>
