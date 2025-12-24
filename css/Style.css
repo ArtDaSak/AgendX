@@ -42,7 +42,7 @@ button{
     touch-action: manipulation;
 }
 
-.TopBar{
+.topBar{
     position: sticky;
     top: 0;
     z-index: 20;
@@ -56,32 +56,63 @@ button{
     gap: 12px;
 }
 
-.Brand{
+.brand {
     display: flex;
     align-items: center;
     gap: 12px;
-    min-width: 0;
 }
 
-.LogoMark{
-    font-family: var(--titleFont);
-    font-size: 18px;
-    line-height: 1;
-    letter-spacing: 1px;
-    color: var(--lavender);
+.brandMark {
     width: 44px;
     height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--vivid-orchid), var(--strong-cyan), var(--velvet-orchid));
     display: grid;
     place-items: center;
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(234,0,217,.95), rgba(10,189,198,.75));
-    box-shadow: 0 0 0 6px rgba(234,0,217,.08);
-    border: 1px solid rgba(235,235,255,.18);
-    flex: 0 0 auto;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
-.BrandText h1{ font-size: 22px; margin: 0; }
-.BrandText p{ font-size: 12px; margin: 2px 0 0 0; color: var(--muted); }
+.brandMark svg {
+    width: 22px;
+    height: 22px;
+    stroke: var(--lavender);
+}
+
+.brandText{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.brandNameRow{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.brandName {
+    font-family: "Iceland", system-ui, sans-serif;
+    font-size: 34px;
+    line-height: 1;
+    margin: 0;
+}
+
+.brandTagline {
+    margin: 6px 0 0 0;
+    opacity: 0.9;
+    font-size: 13px; /* Ensure logical default */
+    color: var(--muted);
+}
+
+.uHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+}
 
 .Main{
     max-width: var(--max);

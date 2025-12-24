@@ -66,6 +66,7 @@ async function boot() {
     AppState.anchorDate.setSeconds(0, 0);
 
     wireUi();
+    initLucideAndFavicon();
     enableSortableIfNeeded();
 
 const SortState = {
@@ -1552,4 +1553,50 @@ function escapeHtml(str) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+}
+
+function initLucideAndFavicon() {
+    if (!window.lucide || typeof window.lucide.createIcons !== "function") {
+        return;
+    }
+
+    // Renderiza todos los <i data-lucide="...">
+    window.lucide.createIcons();
+
+    // Construye favicon desde el SVG ya generado (mismo vector)
+    const sourceSvg = document.querySelector("#faviconSource svg");
+    if (!sourceSvg) {
+        return;
+    }
+
+    const iconInner = sourceSvg.innerHTML;
+
+    const faviconSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <defs>
+                <linearGradient id="agx" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#ea00d9"/>
+                    <stop offset="55%" stop-color="#0abdc6"/>
+                    <stop offset="100%" stop-color="#711c91"/>
+                </linearGradient>
+            </defs>
+
+            <rect x="0" y="0" width="24" height="24" rx="5" fill="url(#agx)"/>
+            <g stroke="#ebebff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                ${iconInner}
+            </g>
+        </svg>
+    `.trim();
+
+    const href = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(faviconSvg);
+
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+    }
+
+    link.type = "image/svg+xml";
+    link.href = href;
 }
