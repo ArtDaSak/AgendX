@@ -5,9 +5,10 @@ import { DateUtils } from "./DateUtils.js";
 const AppState = {
   view: "today",
   anchorDate: new Date(),
-  data: Storage.load(),
-  startDayMode: "quick" // quick | rest
+  data: Storage.load()
 };
+
+let timerTickId = null;
 
 const Dom = {
   Tabs: document.querySelectorAll(".TabBtn"),
@@ -23,44 +24,24 @@ const Dom = {
   OpenCreateBtn: document.getElementById("OpenCreateBtn"),
   Overlay: document.getElementById("Overlay"),
 
-  // Event sheet
   EventSheet: document.getElementById("EventSheet"),
   CloseEventSheetBtn: document.getElementById("CloseEventSheetBtn"),
   CancelEventBtn: document.getElementById("CancelEventBtn"),
   EventSheetTitle: document.getElementById("EventSheetTitle"),
   EventForm: document.getElementById("EventForm"),
   DeleteBtn: document.getElementById("DeleteBtn"),
+
   EventId: document.getElementById("EventId"),
+  EventKind: document.getElementById("EventKind"),
+  TitleWrap: document.getElementById("TitleWrap"),
+  NotesWrap: document.getElementById("NotesWrap"),
   TitleInput: document.getElementById("TitleInput"),
   RangeOrderInput: document.getElementById("RangeOrderInput"),
   DurationInput: document.getElementById("DurationInput"),
   NotesInput: document.getElementById("NotesInput"),
   RepeatType: document.getElementById("RepeatType"),
   StartOnInput: document.getElementById("StartOnInput"),
-  RepeatConfig: document.getElementById("RepeatConfig"),
-
-  // Start day sheet
-  StartDaySheet: document.getElementById("StartDaySheet"),
-  CloseStartDaySheetBtn: document.getElementById("CloseStartDaySheetBtn"),
-  CancelStartDayBtn: document.getElementById("CancelStartDayBtn"),
-  StartDayForm: document.getElementById("StartDayForm"),
-  SegBtns: document.querySelectorAll(".SegBtn"),
-
-  QuickEventBlock: document.getElementById("QuickEventBlock"),
-  RestBlock: document.getElementById("RestBlock"),
-
-  QuickTitle: document.getElementById("QuickTitle"),
-  QuickRange: document.getElementById("QuickRange"),
-  QuickDuration: document.getElementById("QuickDuration"),
-  QuickRepeatType: document.getElementById("QuickRepeatType"),
-  QuickStartOn: document.getElementById("QuickStartOn"),
-  QuickRepeatConfig: document.getElementById("QuickRepeatConfig"),
-
-  RestRange: document.getElementById("RestRange"),
-  RestDuration: document.getElementById("RestDuration"),
-  RestRepeatType: document.getElementById("RestRepeatType"),
-  RestStartOn: document.getElementById("RestStartOn"),
-  RestRepeatConfig: document.getElementById("RestRepeatConfig")
+  RepeatConfig: document.getElementById("RepeatConfig")
 };
 
 boot();
@@ -90,19 +71,17 @@ function wireEvents() {
     render();
   });
 
-  Dom.StartDayBtn.addEventListener("click", onStartDayClick);
+  Dom.StartDayBtn.addEventListener("click", startDayOnly);
 
   Dom.OpenCreateBtn.addEventListener("click", () => openEventSheetForCreate());
 
-  Dom.CloseEventSheetBtn.addEventListener("click", closeSheets);
-  Dom.CancelEventBtn.addEventListener("click", closeSheets);
-
-  Dom.CloseStartDaySheetBtn.addEventListener("click", closeSheets);
-  Dom.CancelStartDayBtn.addEventListener("click", closeSheets);
-
-  Dom.Overlay.addEventListener("click", closeSheets);
+  Dom.CloseEventSheetBtn.addEventListener("click", closeEventSheet);
+  Dom.CancelEventBtn.addEventListener("click", closeEventSheet);
+  Dom.Overlay.addEventListener("click", closeEventSheet);
 
   Dom.RepeatType.addEventListener("change", () => renderRepeatConfig(Dom.RepeatConfig, Dom.RepeatType.value, null));
+  Dom.EventKind.addEventListener("change", () => applyKindUI());
+
   Dom.EventForm.addEventListener("submit", onSubmitEvent);
 
   Dom.DeleteBtn.addEventListener("click", () => {
@@ -110,32 +89,12 @@ function wireEvents() {
     if (!id) return;
 
     AppState.data.events = AppState.data.events.filter(e => e.id !== id);
+    Storage.save(AppState.data);
 
-    // Se invalida sesión si existía un snapshot
-    if (AppState.data.activeDaySession) {
-      const newPlan = buildDayPlan(AppState.data.activeDaySession.dayKey);
-      AppState.data.activeDaySession.plan = newPlan;
-      AppState.data.activeDaySession.planCount = newPlan.length;
-    }
-
-    persistAndRender();
-    closeSheets();
+    // Si el día ya fue iniciado, su snapshot NO se recalcula (se mantiene como estuvo al iniciar)
+    closeEventSheet();
+    render();
   });
-
-  // Start day sheet interactions
-  Dom.SegBtns.forEach(btn => {
-    btn.addEventListener("click", () => {
-      Dom.SegBtns.forEach(x => x.classList.remove("isActive"));
-      btn.classList.add("isActive");
-      AppState.startDayMode = btn.dataset.seg;
-      renderStartDayMode();
-    });
-  });
-
-  Dom.QuickRepeatType.addEventListener("change", () => renderRepeatConfig(Dom.QuickRepeatConfig, Dom.QuickRepeatType.value, null));
-  Dom.RestRepeatType.addEventListener("change", () => renderRepeatConfig(Dom.RestRepeatConfig, Dom.RestRepeatType.value, null));
-
-  Dom.StartDayForm.addEventListener("submit", onConfirmStartDay);
 }
 
 function shiftAnchor(direction) {
@@ -154,17 +113,18 @@ function render() {
 
   let occurrences = Recurrence.buildOccurrences(AppState.data.events, rangeStart, rangeEnd);
 
-  // Semana NO incluye eventos diarios
   if (AppState.view === "week") {
     occurrences = occurrences.filter(o => (o.repeat?.type ?? "none") !== "daily");
   }
 
-  // Día: si el día actual está iniciado, se muestra el snapshot del plan
   if (AppState.view === "today") {
     const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+
+    // Si el día está iniciado, se muestra el snapshot
     if (AppState.data.activeDaySession?.dayKey === dayKey) {
       occurrences = AppState.data.activeDaySession.plan ?? [];
     } else {
+      // Si no está iniciado, se aplican reglas de descanso en vivo
       occurrences = applyRestOverride(occurrences, dayKey);
     }
   }
@@ -181,6 +141,14 @@ function render() {
       const eventId = btn.dataset.edit;
       const found = AppState.data.events.find(e => e.id === eventId);
       if (found) openEventSheetForEdit(found);
+    });
+  });
+
+  // Toggle progreso por ocurrencia (solo si el día está iniciado)
+  Dom.OccurrenceList.querySelectorAll("[data-toggle-done]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const occId = btn.dataset.toggleDone;
+      toggleDone(occId);
     });
   });
 }
@@ -209,9 +177,7 @@ function computeRange() {
 }
 
 function renderOccurrences(occurrences, view) {
-  if (view === "today") {
-    return occurrences.map(rowHtml).join("");
-  }
+  if (view === "today") return occurrences.map(rowHtml).join("");
 
   const byDay = new Map();
   for (const occ of occurrences) {
@@ -225,14 +191,22 @@ function renderOccurrences(occurrences, view) {
     html += `<div class="GroupTitle">${DateUtils.formatHumanDate(day)}</div>`;
     html += list.map(rowHtml).join("");
   }
-
   return html;
 }
 
 function rowHtml(occ) {
   const repeatLabel = repeatToLabel(occ.repeat?.type ?? "none");
-  const isRest = String(occ.title).trim().toLowerCase() === "descanso";
-  const dayActive = AppState.data.activeDaySession?.dayKey === occ.dayKey;
+  const isRest = isRestTitle(occ.title);
+
+  const session = AppState.data.activeDaySession;
+  const dayActive = session?.dayKey === occ.dayKey;
+
+  const done = dayActive ? Boolean(session?.doneByOccId?.[occ.occurrenceId]) : false;
+  const doneBadge = dayActive ? `<span class="Badge ${done ? "isDone" : ""}">${done ? "Hecho" : "Pendiente"}</span>` : "";
+
+  const toggleBtn = dayActive
+    ? `<button class="GhostBtn" type="button" data-toggle-done="${occ.occurrenceId}">${done ? "Desmarcar" : "Hecho"}</button>`
+    : "";
 
   return `
     <article class="Row">
@@ -244,11 +218,12 @@ function rowHtml(occ) {
         <div class="Badges">
           <span class="Badge ${isRest ? "isWarn" : "isAccent"}">${repeatLabel}</span>
           ${occ.durationMin ? `<span class="Badge isCyan">${occ.durationMin} min</span>` : ""}
-          ${dayActive ? `<span class="Badge">Día iniciado</span>` : ""}
+          ${doneBadge}
         </div>
       </div>
 
       <div class="RowActions">
+        ${toggleBtn}
         <button class="GhostBtn" type="button" data-edit="${occ.eventId}">Editar</button>
       </div>
     </article>
@@ -256,99 +231,28 @@ function rowHtml(occ) {
 }
 
 /* -------------------------
-   Iniciar día: pop-up + snapshot
+   Iniciar día (solo inicia)
 -------------------------- */
 
-function onStartDayClick() {
+function startDayOnly() {
   const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
 
-  // Si ya está iniciado ese mismo día, se finaliza
-  if (AppState.data.activeDaySession?.dayKey === dayKey) {
-    AppState.data.activeDaySession = null;
-    persistAndRender();
-    return;
-  }
-
-  // Se abre modal para elegir: evento rápido o descanso (opcional) y luego iniciar
-  openStartDaySheet(dayKey);
-}
-
-function openStartDaySheet(dayKey) {
-  Dom.Overlay.hidden = false;
-  Dom.StartDaySheet.hidden = false;
-
-  // Defaults sobre el día ancla
-  Dom.QuickStartOn.value = dayKey;
-  Dom.RestStartOn.value = dayKey;
-
-  // Render config blocks
-  renderStartDayMode();
-  renderRepeatConfig(Dom.QuickRepeatConfig, Dom.QuickRepeatType.value, null);
-  renderRepeatConfig(Dom.RestRepeatConfig, Dom.RestRepeatType.value, null);
-}
-
-function renderStartDayMode() {
-  const mode = AppState.startDayMode;
-
-  if (mode === "quick") {
-    Dom.QuickEventBlock.hidden = false;
-    Dom.RestBlock.hidden = true;
-    return;
-  }
-
-  Dom.QuickEventBlock.hidden = true;
-  Dom.RestBlock.hidden = false;
-}
-
-function onConfirmStartDay(e) {
-  e.preventDefault();
-
-  const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
-
-  // Se permite crear algo rápido antes de iniciar
-  if (AppState.startDayMode === "quick") {
-    const title = (Dom.QuickTitle.value || "").trim();
-    if (title.length > 0) {
-      const created = buildQuickEventPayload({
-        title,
-        rangeOrder: Number(Dom.QuickRange.value || 10),
-        durationMin: Dom.QuickDuration.value ? Number(Dom.QuickDuration.value) : null,
-        repeatType: Dom.QuickRepeatType.value,
-        startOn: Dom.QuickStartOn.value || dayKey,
-        configRoot: Dom.QuickRepeatConfig
-      });
-
-      AppState.data.events.push(created);
-    }
-  } else {
-    // Descanso
-    const created = buildQuickEventPayload({
-      title: "Descanso",
-      rangeOrder: Number(Dom.RestRange.value || 10),
-      durationMin: Dom.RestDuration.value ? Number(Dom.RestDuration.value) : 30,
-      repeatType: Dom.RestRepeatType.value,
-      startOn: Dom.RestStartOn.value || dayKey,
-      configRoot: Dom.RestRepeatConfig
-    });
-
-    AppState.data.events.push(created);
-  }
-
-  // Se construye snapshot del plan para ese día y se inicia
-  const now = new Date();
-  const rounded = DateUtils.roundToNextHalfHour(now);
+  // Si ya inició ese día, no hace nada
+  if (AppState.data.activeDaySession?.dayKey === dayKey) return;
 
   const plan = buildDayPlan(dayKey);
 
   AppState.data.activeDaySession = {
     dayKey,
-    startedAtIso: rounded.toISOString(),
+    startedAtIso: new Date().toISOString(),  // exacto, sin redondeo
     planCount: plan.length,
-    plan
+    plan,
+    doneByOccId: Object.fromEntries(plan.map(o => [o.occurrenceId, false])),
+    currentIndex: 0
   };
 
-  persistAndRender();
-  closeSheets();
+  Storage.save(AppState.data);
+  render();
 }
 
 function buildDayPlan(dayKey) {
@@ -356,64 +260,270 @@ function buildDayPlan(dayKey) {
   const dayEnd = new Date(dayStart);
   dayEnd.setHours(23, 59, 59, 999);
 
-  // Día incluye TODO (incluye diarios)
   const occ = Recurrence.buildOccurrences(AppState.data.events, dayStart, dayEnd);
-
-  // Se aplica regla de descansos: si existe NO diario en mismo rango -> se elimina descanso
-  const cleaned = applyRestOverride(occ, dayKey);
-
-  return cleaned;
+  return applyRestOverride(occ, dayKey);
 }
+
+/* -------------------------
+   Regla de descanso
+-------------------------- */
 
 function applyRestOverride(occurrences, dayKey) {
   const dayList = occurrences.filter(o => o.dayKey === dayKey);
 
-  // Se detectan rangos que tienen evento NO diario
+  // Rango ocupado por evento NO diario => se elimina descanso en ese rango
   const nonDailyRanges = new Set();
   for (const o of dayList) {
     const type = o.repeat?.type ?? "none";
     if (type !== "daily") nonDailyRanges.add(o.rangeOrder);
   }
 
-  // Si hay evento NO diario en rango X, se elimina cualquier "Descanso" en X
-  const out = dayList.filter(o => {
-    const isRest = String(o.title).trim().toLowerCase() === "descanso";
-    if (!isRest) return true;
+  const filtered = dayList.filter(o => {
+    if (!isRestTitle(o.title)) return true;
     return !nonDailyRanges.has(o.rangeOrder);
   });
 
-  // Se ordena por rango (y si hay duplicados, mantiene orden estable)
-  out.sort((a, b) => a.rangeOrder - b.rangeOrder);
+  filtered.sort((a, b) => a.rangeOrder - b.rangeOrder);
+  return filtered;
+}
 
-  return out;
+function isRestTitle(title) {
+  return String(title ?? "").trim().toLowerCase() === "descanso";
 }
 
 /* -------------------------
-   Evento Sheet (CRUD)
+   Progreso + Siguiente rango
+-------------------------- */
+
+function toggleDone(occurrenceId) {
+  const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+  const session = AppState.data.activeDaySession;
+
+  if (!session || session.dayKey !== dayKey) return;
+
+  session.doneByOccId[occurrenceId] = !session.doneByOccId[occurrenceId];
+
+  // Si se marcó hecho el actual, puede avanzar
+  const current = getCurrentOccurrence(session);
+  if (current && session.doneByOccId[current.occurrenceId]) {
+    moveToNext(session);
+  }
+
+  Storage.save(AppState.data);
+  render();
+}
+
+function moveToNext(session) {
+  const total = session.plan.length;
+  if (total === 0) return;
+
+  // Busca el siguiente pendiente desde currentIndex+1 con wrap
+  for (let step = 1; step <= total; step++) {
+    const idx = (session.currentIndex + step) % total;
+    const occ = session.plan[idx];
+    if (!session.doneByOccId[occ.occurrenceId]) {
+      session.currentIndex = idx;
+      return;
+    }
+  }
+
+  // Si todos están hechos, se queda en el mismo
+}
+
+/* -------------------------
+   Temporizador en tiempo real
+-------------------------- */
+
+function renderActiveDaySession() {
+  const session = AppState.data.activeDaySession;
+  const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+
+  stopTimerTick();
+
+  if (!session) {
+    Dom.ActiveSession.classList.remove("isVisible");
+    Dom.ActiveSession.innerHTML = "";
+    return;
+  }
+
+  const startedAt = new Date(session.startedAtIso);
+  const startedTime = DateUtils.formatTimeHHMM(startedAt);
+
+  const isSameDay = session.dayKey === dayKey;
+  const doneCount = Object.values(session.doneByOccId ?? {}).filter(Boolean).length;
+  const total = session.planCount ?? 0;
+
+  Dom.ActiveSession.classList.add("isVisible");
+
+  // Botones de progreso solo si estás viendo el mismo día iniciado
+  const controls = isSameDay ? `
+    <div class="RowActions" style="justify-content:flex-end">
+      <button class="GhostBtn" id="NextRangeBtn" type="button">Siguiente rango</button>
+      <button class="PrimaryBtn" id="MarkCurrentBtn" type="button">Marcar hecho</button>
+    </div>
+  ` : "";
+
+  Dom.ActiveSession.innerHTML = `
+    <div>
+      <strong>Día iniciado</strong>
+      <small>${escapeHtml(session.dayKey)} · Inicio ${startedTime} · Progreso ${doneCount}/${total}</small>
+    </div>
+
+    <div class="TimerLine" id="TimerLine">
+      <div class="MainLine">
+        <span id="TimerMain">—</span>
+        <span id="TimerRemain">—</span>
+      </div>
+      <div class="SubLine" id="TimerSub">—</div>
+    </div>
+
+    ${controls}
+  `;
+
+  if (isSameDay) {
+    document.getElementById("NextRangeBtn")?.addEventListener("click", () => {
+      moveToNext(session);
+      Storage.save(AppState.data);
+      render();
+    });
+
+    document.getElementById("MarkCurrentBtn")?.addEventListener("click", () => {
+      const current = getCurrentOccurrence(session);
+      if (!current) return;
+      session.doneByOccId[current.occurrenceId] = true;
+      moveToNext(session);
+      Storage.save(AppState.data);
+      render();
+    });
+
+    startTimerTick(session);
+  }
+}
+
+function getCurrentOccurrence(session) {
+  if (!session.plan || session.plan.length === 0) return null;
+
+  // Garantiza que currentIndex apunte a algo válido; si ese está hecho, busca pendiente
+  const current = session.plan[session.currentIndex] ?? null;
+  if (current && !session.doneByOccId[current.occurrenceId]) return current;
+
+  // Busca el primero pendiente
+  const idx = session.plan.findIndex(o => !session.doneByOccId[o.occurrenceId]);
+  if (idx >= 0) {
+    session.currentIndex = idx;
+    return session.plan[idx];
+  }
+
+  // Si todo está hecho, devuelve el current
+  return current;
+}
+
+function startTimerTick(session) {
+  const tick = () => {
+    const current = getCurrentOccurrence(session);
+    const mainEl = document.getElementById("TimerMain");
+    const remainEl = document.getElementById("TimerRemain");
+    const subEl = document.getElementById("TimerSub");
+
+    if (!mainEl || !remainEl || !subEl) return;
+
+    if (!current) {
+      mainEl.textContent = "Sin rango actual";
+      remainEl.textContent = "";
+      subEl.textContent = "";
+      return;
+    }
+
+    const schedule = buildSchedule(session);
+    const item = schedule.find(x => x.occurrenceId === current.occurrenceId);
+
+    mainEl.textContent = `R${current.rangeOrder} · ${current.title}`;
+
+    if (!item || item.durationSec <= 0) {
+      remainEl.textContent = "Sin duración";
+      subEl.textContent = "Define minutos para ver el temporizador en tiempo real";
+      return;
+    }
+
+    const now = Date.now();
+    const endMs = item.endMs;
+    const startMs = item.startMs;
+    const remainSec = Math.max(0, Math.floor((endMs - now) / 1000));
+    const elapsedSec = Math.max(0, Math.floor((now - startMs) / 1000));
+
+    remainEl.textContent = `-${DateUtils.formatHMS(remainSec)}`;
+    subEl.textContent = `Transcurrido ${DateUtils.formatHMS(elapsedSec)} · Faltan ${DateUtils.formatHMS(remainSec)} para concluir`;
+
+    // También calcula restante estimado del día (solo de pendientes con duración)
+    const pendingRemainSec = schedule
+      .filter(x => !session.doneByOccId[x.occurrenceId])
+      .reduce((acc, x) => acc + Math.max(0, x.endMs - Math.max(now, x.startMs)), 0);
+
+    const pendingRemainTotalSec = Math.floor(pendingRemainSec / 1000);
+    subEl.textContent += ` · Restante total (estimado): ${DateUtils.formatHMS(pendingRemainTotalSec)}`;
+  };
+
+  tick();
+  timerTickId = setInterval(tick, 1000);
+}
+
+function stopTimerTick() {
+  if (timerTickId) {
+    clearInterval(timerTickId);
+    timerTickId = null;
+  }
+}
+
+function buildSchedule(session) {
+  const startMs = new Date(session.startedAtIso).getTime();
+  let cursorMs = startMs;
+
+  const schedule = [];
+  for (const occ of session.plan) {
+    const durationSec = (occ.durationMin ? Number(occ.durationMin) : 0) * 60;
+    const item = {
+      occurrenceId: occ.occurrenceId,
+      startMs: cursorMs,
+      durationSec,
+      endMs: cursorMs + durationSec * 1000
+    };
+    schedule.push(item);
+    cursorMs = item.endMs;
+  }
+  return schedule;
+}
+
+/* -------------------------
+   Event Sheet (Agregar/Editar) + Descanso
 -------------------------- */
 
 function openEventSheetForCreate() {
-  Dom.EventSheetTitle.textContent = "Agregar evento";
+  Dom.EventSheetTitle.textContent = "Agregar Evento";
   Dom.DeleteBtn.hidden = true;
 
   Dom.EventId.value = "";
+  Dom.EventKind.value = "event";
+
   Dom.TitleInput.value = "";
   Dom.RangeOrderInput.value = "10";
-  Dom.DurationInput.value = "";
+  Dom.DurationInput.value = "45";
   Dom.NotesInput.value = "";
 
   Dom.RepeatType.value = "none";
   Dom.StartOnInput.value = DateUtils.toLocalDateKey(AppState.anchorDate);
 
   renderRepeatConfig(Dom.RepeatConfig, Dom.RepeatType.value, null);
+  applyKindUI();
   openEventSheet();
 }
 
 function openEventSheetForEdit(event) {
-  Dom.EventSheetTitle.textContent = "Editar evento";
+  Dom.EventSheetTitle.textContent = "Editar Evento";
   Dom.DeleteBtn.hidden = false;
 
   Dom.EventId.value = event.id;
+  Dom.EventKind.value = event.kind ?? (isRestTitle(event.title) ? "rest" : "event");
+
   Dom.TitleInput.value = event.title ?? "";
   Dom.RangeOrderInput.value = String(event.rangeOrder ?? 10);
   Dom.DurationInput.value = event.durationMin ?? "";
@@ -423,7 +533,27 @@ function openEventSheetForEdit(event) {
   Dom.StartOnInput.value = event.startOn ?? DateUtils.toLocalDateKey(AppState.anchorDate);
 
   renderRepeatConfig(Dom.RepeatConfig, Dom.RepeatType.value, event);
+  applyKindUI();
   openEventSheet();
+}
+
+function applyKindUI() {
+  const kind = Dom.EventKind.value;
+
+  if (kind === "rest") {
+    Dom.TitleWrap.style.display = "none";
+    Dom.NotesWrap.style.display = "none";
+    Dom.TitleInput.required = false;
+
+    // Descanso: título fijo
+    Dom.TitleInput.value = "Descanso";
+  } else {
+    Dom.TitleWrap.style.display = "";
+    Dom.NotesWrap.style.display = "";
+    Dom.TitleInput.required = true;
+
+    if (isRestTitle(Dom.TitleInput.value)) Dom.TitleInput.value = "";
+  }
 }
 
 function openEventSheet() {
@@ -431,23 +561,31 @@ function openEventSheet() {
   Dom.EventSheet.hidden = false;
 }
 
+function closeEventSheet() {
+  Dom.Overlay.hidden = true;
+  Dom.EventSheet.hidden = true;
+}
+
 function onSubmitEvent(e) {
   e.preventDefault();
 
   const id = Dom.EventId.value || crypto.randomUUID();
-  const title = Dom.TitleInput.value.trim();
+  const kind = Dom.EventKind.value;
+
+  const title = (kind === "rest") ? "Descanso" : Dom.TitleInput.value.trim();
   const rangeOrder = Number(Dom.RangeOrderInput.value);
   const durationMin = Dom.DurationInput.value ? Number(Dom.DurationInput.value) : null;
-  const notes = Dom.NotesInput.value.trim();
+  const notes = (kind === "rest") ? "" : Dom.NotesInput.value.trim();
+
   const startOn = Dom.StartOnInput.value || DateUtils.toLocalDateKey(new Date());
   const repeatType = Dom.RepeatType.value;
 
   const weekdayFilter = getWeekdayFilter(Dom.RepeatConfig);
-
   const repeat = buildRepeat(repeatType, Dom.RepeatConfig);
 
   const payload = {
     id,
+    kind,
     title,
     rangeOrder,
     durationMin,
@@ -461,19 +599,15 @@ function onSubmitEvent(e) {
   if (idx >= 0) AppState.data.events[idx] = payload;
   else AppState.data.events.push(payload);
 
-  // Si hay un día activo, se actualiza snapshot para mantener consistencia (simple)
-  if (AppState.data.activeDaySession) {
-    const newPlan = buildDayPlan(AppState.data.activeDaySession.dayKey);
-    AppState.data.activeDaySession.plan = newPlan;
-    AppState.data.activeDaySession.planCount = newPlan.length;
-  }
+  Storage.save(AppState.data);
 
-  persistAndRender();
-  closeSheets();
+  // Si el día ya está iniciado, se respeta snapshot (no se recalcula)
+  closeEventSheet();
+  render();
 }
 
 /* -------------------------
-   Repeat Config UI (reutilizable)
+   Repeat Config (días permitidos + configs)
 -------------------------- */
 
 function renderRepeatConfig(container, type, eventOrNull) {
@@ -481,7 +615,7 @@ function renderRepeatConfig(container, type, eventOrNull) {
 
   const weekdaysBlock = `
     <div class="Field">
-      <span>Días permitidos (opcional)</span>
+      <span>Días permitidos (uno o varios)</span>
       <div class="CheckRow">
         ${weekdayPill(1, "Lun", selectedWeekdays, "AllowedWeekday")}
         ${weekdayPill(2, "Mar", selectedWeekdays, "AllowedWeekday")}
@@ -551,7 +685,6 @@ function renderRepeatConfig(container, type, eventOrNull) {
     return;
   }
 
-  // daily / none
   container.innerHTML = `${weekdaysBlock}<div class="Empty">Sin configuración adicional</div>`;
 }
 
@@ -604,64 +737,9 @@ function buildRepeat(type, container) {
   return { type: "none" };
 }
 
-function buildQuickEventPayload({ title, rangeOrder, durationMin, repeatType, startOn, configRoot }) {
-  const weekdayFilter = getWeekdayFilter(configRoot);
-  const repeat = buildRepeat(repeatType, configRoot);
-
-  return {
-    id: crypto.randomUUID(),
-    title,
-    rangeOrder,
-    durationMin,
-    notes: "",
-    startOn,
-    weekdayFilter,
-    repeat
-  };
-}
-
-/* -------------------------
-   Sesión activa (Día)
--------------------------- */
-
-function renderActiveDaySession() {
-  const session = AppState.data.activeDaySession;
-  const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
-
-  if (!session) {
-    Dom.ActiveSession.classList.remove("isVisible");
-    Dom.ActiveSession.innerHTML = "";
-    Dom.StartDayBtn.textContent = "Iniciar día";
-    return;
-  }
-
-  const startedAt = new Date(session.startedAtIso);
-  const time = DateUtils.formatTimeHHMM(startedAt);
-
-  Dom.ActiveSession.classList.add("isVisible");
-  Dom.ActiveSession.innerHTML = `
-    <strong>Día iniciado</strong>
-    <small>${escapeHtml(session.dayKey)} · Inicio ${time} (redondeado) · ${session.planCount ?? 0} rangos</small>
-  `;
-
-  // Solo muestra "Finalizar día" si el ancla está en el mismo día iniciado
-  Dom.StartDayBtn.textContent = (session.dayKey === dayKey) ? "Finalizar día" : "Iniciar día";
-}
-
 /* -------------------------
    Helpers
 -------------------------- */
-
-function closeSheets() {
-  Dom.Overlay.hidden = true;
-  Dom.EventSheet.hidden = true;
-  Dom.StartDaySheet.hidden = true;
-}
-
-function persistAndRender() {
-  Storage.save(AppState.data);
-  render();
-}
 
 function repeatToLabel(type) {
   if (type === "none") return "Único";

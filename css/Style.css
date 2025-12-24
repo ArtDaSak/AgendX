@@ -8,7 +8,6 @@
   --prussian-blue: #091833;
 
   --bg: var(--prussian-blue);
-  --panel: rgba(19, 62, 124, 0.20);
   --text: var(--lavender);
   --muted: rgba(235, 235, 255, 0.72);
   --stroke: rgba(235, 235, 255, 0.14);
@@ -197,6 +196,10 @@ h1,h2,h3{
   border-color: rgba(235,235,255,.30);
   background: rgba(235,235,255,.10);
 }
+.Badge.isDone{
+  border-color: rgba(10,189,198,.40);
+  background: rgba(10,189,198,.18);
+}
 
 .RowActions{
   display: flex;
@@ -249,7 +252,7 @@ button{
 }
 .ActiveSession.isVisible{
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 .ActiveSession strong{
   font-size: 14px;
@@ -257,6 +260,29 @@ button{
 }
 .ActiveSession small{
   color: var(--muted);
+}
+
+.TimerLine{
+  border: 1px solid rgba(235,235,255,.16);
+  background: rgba(235,235,255,.04);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+.TimerLine .MainLine{
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+.TimerLine .MainLine span{
+  font-family: var(--titleFont);
+  font-size: 16px;
+}
+.TimerLine .SubLine{
+  font-size: 12px;
+  color: rgba(235,235,255,.72);
 }
 
 .Overlay{
@@ -335,7 +361,6 @@ textarea{ resize: none; }
   display: grid;
   gap: 10px;
 }
-
 .CheckRow{
   display: flex;
   flex-wrap: wrap;
@@ -373,25 +398,6 @@ textarea{ resize: none; }
   border-left: 3px solid rgba(234,0,217,.45);
 }
 
-/* Start Day UI extras */
-.Segmented{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.SegBtn{
-  border: 1px solid var(--stroke);
-  background: rgba(235,235,255,.04);
-  color: var(--text);
-  padding: 10px 12px;
-  border-radius: 999px;
-  font-weight: 900;
-}
-.SegBtn.isActive{
-  background: linear-gradient(135deg, rgba(10,189,198,.20), rgba(234,0,217,.18));
-  border-color: rgba(10,189,198,.30);
-}
-
 .HintBox{
   border: 1px solid rgba(235,235,255,.16);
   background: rgba(235,235,255,.04);
@@ -406,12 +412,4 @@ textarea{ resize: none; }
 }
 .HintBox small{
   color: rgba(235,235,255,.72);
-}
-
-.PillInfo{
-  border: 1px solid rgba(235,235,255,.16);
-  background: rgba(234,0,217,.10);
-  border-radius: 999px;
-  padding: 10px 12px;
-  font-size: 13px;
 }

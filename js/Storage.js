@@ -1,4 +1,4 @@
-const StorageKey = "AgendXDataV1";
+const StorageKey = "AgendXDataV2";
 
 export const Storage = {
   load() {
@@ -7,12 +7,10 @@ export const Storage = {
       if (!raw) return this.defaultState();
 
       const parsed = JSON.parse(raw);
-      const safe = {
+      return {
         events: Array.isArray(parsed.events) ? parsed.events : [],
         activeDaySession: parsed.activeDaySession ?? null
       };
-
-      return safe;
     } catch {
       return this.defaultState();
     }

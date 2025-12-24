@@ -33,15 +33,6 @@ export const DateUtils = {
     return end;
   },
 
-  roundToNextHalfHour(date) {
-    const copy = new Date(date);
-    const minutes = copy.getMinutes();
-    const add = minutes === 0 || minutes === 30 ? 0 : (minutes < 30 ? (30 - minutes) : (60 - minutes));
-    if (add > 0) copy.setMinutes(minutes + add);
-    copy.setSeconds(0, 0);
-    return copy;
-  },
-
   formatTimeHHMM(date) {
     const hh = String(date.getHours()).padStart(2, "0");
     const mm = String(date.getMinutes()).padStart(2, "0");
@@ -50,5 +41,14 @@ export const DateUtils = {
 
   formatHumanDate(date) {
     return date.toLocaleDateString("es-CO", { weekday: "short", month: "short", day: "numeric" });
+  },
+
+  formatHMS(totalSeconds) {
+    const s = Math.max(0, Math.floor(totalSeconds));
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    if (hh > 0) return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+    return `${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
   }
 };

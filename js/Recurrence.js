@@ -42,7 +42,6 @@ export const Recurrence = {
   },
 
   matches(event, dayKey) {
-    // Se filtra por días permitidos (si existe)
     const weekdayFilter = Array.isArray(event.weekdayFilter) ? event.weekdayFilter : [];
     if (weekdayFilter.length > 0) {
       const weekday = DateUtils.fromLocalDateKey(dayKey).getDay(); // 0 dom - 6 sáb

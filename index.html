@@ -57,7 +57,7 @@
   <!-- Modal Overlay -->
   <div class="Overlay" id="Overlay" hidden></div>
 
-  <!-- Bottom Sheet: Evento (crear/editar) -->
+  <!-- Bottom Sheet: Agregar Evento / Descanso -->
   <section class="Sheet" id="EventSheet" hidden aria-modal="true" role="dialog" aria-labelledby="EventSheetTitle">
     <header class="SheetHeader">
       <h3 id="EventSheetTitle">Agregar evento</h3>
@@ -67,26 +67,40 @@
     <form class="SheetBody" id="EventForm">
       <input type="hidden" id="EventId" />
 
-      <label class="Field">
-        <span>Título</span>
-        <input id="TitleInput" required maxlength="60" placeholder="Ej. Estudiar JavaScript" />
-      </label>
+      <div class="Grid2">
+        <label class="Field">
+          <span>Tipo</span>
+          <select id="EventKind">
+            <option value="event">Evento</option>
+            <option value="rest">Descanso</option>
+          </select>
+        </label>
 
-      <label class="Field">
-        <span>Rango (prioridad)</span>
-        <input id="RangeOrderInput" type="number" min="1" step="1" value="10" required />
-        <small>Orden del día sin horarios</small>
-      </label>
+        <label class="Field">
+          <span>Rango (prioridad)</span>
+          <input id="RangeOrderInput" type="number" min="1" step="1" value="10" required />
+        </label>
+      </div>
+
+      <div id="TitleWrap">
+        <label class="Field">
+          <span>Título</span>
+          <input id="TitleInput" required maxlength="60" placeholder="Ej. Estudiar JavaScript" />
+        </label>
+      </div>
 
       <label class="Field">
         <span>Tiempo (min)</span>
-        <input id="DurationInput" type="number" min="0" step="5" placeholder="Opcional" />
+        <input id="DurationInput" type="number" min="0" step="5" placeholder="Ej. 45" />
+        <small>Se usa para el temporizador en tiempo real</small>
       </label>
 
-      <label class="Field">
-        <span>Notas</span>
-        <textarea id="NotesInput" rows="2" maxlength="180" placeholder="Opcional"></textarea>
-      </label>
+      <div id="NotesWrap">
+        <label class="Field">
+          <span>Notas</span>
+          <textarea id="NotesInput" rows="2" maxlength="180" placeholder="Opcional"></textarea>
+        </label>
+      </div>
 
       <div class="Grid2">
         <label class="Field">
@@ -109,113 +123,16 @@
 
       <div class="RepeatConfig" id="RepeatConfig"></div>
 
+      <div class="HintBox">
+        <strong>Regla de Descanso</strong>
+        <small>Si en un día existe un evento NO diario en el mismo rango, el “Descanso” de ese rango se elimina automáticamente.</small>
+      </div>
+
       <div class="SheetFooter">
         <button class="DangerBtn" id="DeleteBtn" type="button" hidden>Eliminar</button>
         <div class="Spacer"></div>
         <button class="GhostBtn" id="CancelEventBtn" type="button">Cancelar</button>
         <button class="PrimaryBtn" type="submit">Guardar</button>
-      </div>
-    </form>
-  </section>
-
-  <!-- Bottom Sheet: Iniciar Día (Evento rápido / Descanso) -->
-  <section class="Sheet" id="StartDaySheet" hidden aria-modal="true" role="dialog" aria-labelledby="StartDayTitle">
-    <header class="SheetHeader">
-      <h3 id="StartDayTitle">Iniciar día</h3>
-      <button class="IconBtn" id="CloseStartDaySheetBtn" type="button" aria-label="Cerrar">✕</button>
-    </header>
-
-    <form class="SheetBody" id="StartDayForm">
-      <div class="Segmented">
-        <button class="SegBtn isActive" type="button" data-seg="quick">Evento rápido</button>
-        <button class="SegBtn" type="button" data-seg="rest">Descanso</button>
-      </div>
-
-      <div class="HintBox">
-        <strong>Regla</strong>
-        <small>Si hay un evento NO diario en el mismo rango del día, cualquier “Descanso” en ese rango se elimina.</small>
-      </div>
-
-      <div id="QuickEventBlock">
-        <label class="Field">
-          <span>Título</span>
-          <input id="QuickTitle" maxlength="60" placeholder="Ej. Reunión" />
-        </label>
-
-        <div class="Grid2">
-          <label class="Field">
-            <span>Rango</span>
-            <input id="QuickRange" type="number" min="1" step="1" value="10" />
-          </label>
-
-          <label class="Field">
-            <span>Tiempo (min)</span>
-            <input id="QuickDuration" type="number" min="0" step="5" placeholder="Opcional" />
-          </label>
-        </div>
-
-        <div class="Grid2">
-          <label class="Field">
-            <span>Repetición</span>
-            <select id="QuickRepeatType">
-              <option value="none">Solo hoy</option>
-              <option value="daily">Diaria</option>
-              <option value="weekly">Semanal</option>
-              <option value="monthly">Mensual</option>
-              <option value="interval">Cada N días</option>
-              <option value="dates">Fechas específicas</option>
-            </select>
-          </label>
-
-          <label class="Field">
-            <span>Inicia desde</span>
-            <input id="QuickStartOn" type="date" />
-          </label>
-        </div>
-
-        <div class="RepeatConfig" id="QuickRepeatConfig"></div>
-      </div>
-
-      <div id="RestBlock" hidden>
-        <div class="PillInfo">Título fijo: <strong>Descanso</strong></div>
-
-        <div class="Grid2">
-          <label class="Field">
-            <span>Rango</span>
-            <input id="RestRange" type="number" min="1" step="1" value="10" />
-          </label>
-
-          <label class="Field">
-            <span>Tiempo (min)</span>
-            <input id="RestDuration" type="number" min="0" step="5" value="30" />
-          </label>
-        </div>
-
-        <div class="Grid2">
-          <label class="Field">
-            <span>Repetición</span>
-            <select id="RestRepeatType">
-              <option value="none">Solo hoy</option>
-              <option value="daily">Diaria</option>
-              <option value="weekly">Semanal</option>
-              <option value="monthly">Mensual</option>
-              <option value="interval">Cada N días</option>
-              <option value="dates">Fechas específicas</option>
-            </select>
-          </label>
-
-          <label class="Field">
-            <span>Inicia desde</span>
-            <input id="RestStartOn" type="date" />
-          </label>
-        </div>
-
-        <div class="RepeatConfig" id="RestRepeatConfig"></div>
-      </div>
-
-      <div class="SheetFooter">
-        <button class="GhostBtn" id="CancelStartDayBtn" type="button">Cancelar</button>
-        <button class="PrimaryBtn" id="ConfirmStartDayBtn" type="submit">Iniciar</button>
       </div>
     </form>
   </section>
