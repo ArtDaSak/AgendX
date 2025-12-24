@@ -132,6 +132,26 @@
     </form>
   </section>
 
+    <!-- Confirm Modal -->
+  <div class="ModalOverlay" id="ConfirmOverlay" hidden></div>
+
+  <section class="Modal" id="ConfirmModal" hidden role="dialog" aria-modal="true" aria-labelledby="ConfirmTitle">
+    <header class="ModalHeader">
+      <h3 id="ConfirmTitle">Confirmación</h3>
+      <button class="IconBtn" id="ConfirmCloseBtn" type="button" aria-label="Cerrar">✕</button>
+    </header>
+
+    <div class="ModalBody" id="ConfirmBody">
+      ¿Seguro?
+    </div>
+
+    <footer class="ModalFooter">
+      <button class="GhostBtn" id="ConfirmCancelBtn" type="button">Cancelar</button>
+      <button class="DangerBtn" id="ConfirmOkBtn" type="button">Finalizar día</button>
+    </footer>
+  </section>
+
+
   <script type="module" src="./js/App.js"></script>
 </body>
 </html>

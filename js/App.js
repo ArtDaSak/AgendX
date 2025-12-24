@@ -49,7 +49,15 @@ const Dom = {
   NotesInput: document.getElementById("NotesInput"),
   RepeatType: document.getElementById("RepeatType"),
   StartOnInput: document.getElementById("StartOnInput"),
-  RepeatConfig: document.getElementById("RepeatConfig")
+  RepeatConfig: document.getElementById("RepeatConfig"),
+
+  ConfirmOverlay: document.getElementById("ConfirmOverlay"),
+  ConfirmModal: document.getElementById("ConfirmModal"),
+  ConfirmTitle: document.getElementById("ConfirmTitle"),
+  ConfirmBody: document.getElementById("ConfirmBody"),
+  ConfirmCloseBtn: document.getElementById("ConfirmCloseBtn"),
+  ConfirmCancelBtn: document.getElementById("ConfirmCancelBtn"),
+  ConfirmOkBtn: document.getElementById("ConfirmOkBtn")
 };
 
 boot();
@@ -59,6 +67,7 @@ async function boot() {
   AppState.anchorDate.setSeconds(0, 0);
 
   wireEvents();
+  wireConfirmModalOnce();
   renderLoading();
 
   try {
@@ -115,40 +124,41 @@ async function hydrateFromApi() {
   const events = await Api.getEvents();
   AppState.data.events = Array.isArray(events) ? events : [];
 
-  const recs = await Api.getRecurrences();
-  const list = Array.isArray(recs) ? recs : [];
+const recs = await Api.getRecurrences();
+const list = Array.isArray(recs) ? recs : [];
 
-  const todayKey = DateUtils.toLocalDateKey(new Date());
-  const now = Date.now();
+const yKey = yesterdayKey();
+const now = Date.now();
 
-  // Se limpia cualquier registro vencido o active de otro día
-  for (const r of list) {
-    const keepUntil = r.keepUntil ? new Date(r.keepUntil).getTime() : null;
-    const expired = keepUntil && now > keepUntil;
-    const invalidActive = (r.status === "active" && r.dayKey !== todayKey);
+// Se borra antier o más viejo, o expirados por keepUntil
+for (const r of list) {
+  const keepUntil = r.keepUntil ? new Date(r.keepUntil).getTime() : null;
+  const expired = keepUntil && now > keepUntil;
 
-    if (expired || invalidActive) {
-      await safeDeleteRecurrence(r.id);
-    }
+  const isOlderThanYesterday = (r.dayKey && r.dayKey < yKey);
+
+  if (expired || isOlderThanYesterday) {
+    await safeDeleteRecurrence(r.id);
   }
+}
 
-  // Se vuelve a consultar para quedar limpio y tomar el active de hoy
-  const recs2 = await Api.getRecurrences();
-  const list2 = Array.isArray(recs2) ? recs2 : [];
+// Se recarga y se busca active (puede ser hoy o ayer)
+const recs2 = await Api.getRecurrences();
+const list2 = Array.isArray(recs2) ? recs2 : [];
 
-  const todayActives = list2.filter(r => r.status === "active" && r.dayKey === todayKey);
+const actives = list2.filter(r => r.status === "active" && r.dayKey >= yKey);
 
-  // Si hay más de 1 active, se deja solo el más reciente y se eliminan los otros
-  if (todayActives.length > 1) {
-    const sorted = [...todayActives].sort((a, b) => new Date(b.startedAtIso) - new Date(a.startedAtIso));
-    const keep = sorted[0];
-    for (const extra of sorted.slice(1)) await safeDeleteRecurrence(extra.id);
-    setActiveSessionFromRemote(keep);
-  } else if (todayActives.length === 1) {
-    setActiveSessionFromRemote(todayActives[0]);
-  } else {
-    AppState.data.activeDaySession = null;
-  }
+// Si hay más de 1 active, se deja el más reciente
+if (actives.length > 1) {
+  const sorted = [...actives].sort((a, b) => new Date(b.startedAtIso) - new Date(a.startedAtIso));
+  const keep = sorted[0];
+  for (const extra of sorted.slice(1)) await safeDeleteRecurrence(extra.id);
+  setActiveSessionFromRemote(keep);
+} else if (actives.length === 1) {
+  setActiveSessionFromRemote(actives[0]);
+} else {
+  AppState.data.activeDaySession = null;
+}
 }
 
 function setActiveSessionFromRemote(remote) {
@@ -179,6 +189,12 @@ function render() {
   }
 
   Dom.OpenCreateBtn.disabled = AppState.isSaving;
+
+  if (AppState.view === "today" && AppState.data.activeDaySession?.dayKey) {
+    const sk = AppState.data.activeDaySession.dayKey;
+    const ak = DateUtils.toLocalDateKey(AppState.anchorDate);
+    if (ak !== sk) AppState.anchorDate = DateUtils.fromLocalDateKey(sk);
+  }
 
   renderActiveDaySession();
   updateStartDayButtonState();
@@ -363,7 +379,7 @@ async function startDayOnly() {
     plan,
     doneByOccId,
     currentIndex: 0,
-    keepUntil: endOfDayIso(dayKey),
+    keepUntil: keepUntilIso(dayKey),
     createdAt: nowIso,
     updatedAt: nowIso
   };
@@ -389,6 +405,20 @@ function endOfDayIso(dayKey) {
   const d = DateUtils.fromLocalDateKey(dayKey);
   d.setHours(23, 59, 59, 999);
   return d.toISOString();
+}
+
+function yesterdayKey() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return DateUtils.toLocalDateKey(DateUtils.addDays(d, -1));
+}
+
+// keepUntil = fin del día siguiente al dayKey (para sobrevivir la medianoche)
+function keepUntilIso(dayKey) {
+  const d = DateUtils.fromLocalDateKey(dayKey);
+  const next = DateUtils.addDays(d, 1);
+  next.setHours(23, 59, 59, 999);
+  return next.toISOString();
 }
 
 /* -------------------------
@@ -479,7 +509,7 @@ async function saveActiveSessionToApiNow() {
     plan: session.plan,
     doneByOccId: session.doneByOccId,
     currentIndex: session.currentIndex,
-    keepUntil: endOfDayIso(session.dayKey),
+    keepUntil: keepUntilIso(session.dayKey),
     updatedAt: new Date().toISOString()
   };
 
@@ -581,12 +611,13 @@ function renderActiveDaySession() {
 
   Dom.ActiveSession.classList.add("isVisible");
 
-  const controls = isSameDay ? `
-    <div class="RowActions" style="justify-content:flex-end">
-      <button class="GhostBtn" id="NextRangeBtn" type="button">Siguiente rango</button>
-      <button class="PrimaryBtn" id="MarkCurrentBtn" type="button">Marcar hecho</button>
-    </div>
-  ` : "";
+const controls = `
+  <div class="RowActions" style="justify-content:flex-end">
+    <button class="GhostBtn" id="NextRangeBtn" type="button">Siguiente rango</button>
+    <button class="PrimaryBtn" id="MarkCurrentBtn" type="button">Marcar hecho</button>
+    <button class="DangerBtn" id="FinalizeDayBtn" type="button">Finalizar día</button>
+  </div>
+`;
 
   Dom.ActiveSession.innerHTML = `
     <div>
@@ -604,6 +635,37 @@ function renderActiveDaySession() {
 
     ${controls}
   `;
+
+const finalizeBtn = document.getElementById("FinalizeDayBtn");
+if (finalizeBtn) {
+  finalizeBtn.disabled = AppState.isSaving;
+  finalizeBtn.addEventListener("click", finalizeDay);
+}
+
+    const nextBtn = document.getElementById("NextRangeBtn");
+    if (nextBtn) {
+    nextBtn.disabled = AppState.isSaving;
+    nextBtn.addEventListener("click", () => {
+        moveToNext(session);
+        queueActiveSessionSave();
+        render();
+    });
+    }
+
+    const markBtn = document.getElementById("MarkCurrentBtn");
+    if (markBtn) {
+    markBtn.disabled = AppState.isSaving;
+    markBtn.addEventListener("click", () => {
+        const current = getCurrentOccurrence(session);
+        if (!current) return;
+
+        session.doneByOccId[current.occurrenceId] = true;
+        moveToNext(session);
+
+        queueActiveSessionSave();
+        render();
+    });
+    }
 
   if (isSameDay) {
     document.getElementById("NextRangeBtn")?.addEventListener("click", () => {
@@ -623,12 +685,31 @@ function renderActiveDaySession() {
       render();
     });
 
+    document.getElementById("FinalizeDayBtn")?.addEventListener("click", finalizeDay);
+
     startTimerTick(session);
   }
 }
 
 function startTimerTick(session) {
   const tick = () => {
+    const total = session.plan?.length ?? 0;
+    const doneCount = Object.values(session.doneByOccId ?? {}).filter(Boolean).length;
+
+    if (total > 0 && doneCount === total) {
+    const timerLine = document.getElementById("TimerLine");
+    const mainEl = document.getElementById("TimerMain");
+    const remainEl = document.getElementById("TimerRemain");
+    const subEl = document.getElementById("TimerSub");
+    if (!mainEl || !remainEl || !subEl) return;
+
+    mainEl.textContent = "Día completado ✔︎";
+    remainEl.textContent = "";
+    subEl.textContent = "Todo listo. Puedes finalizar el día.";
+    timerLine?.classList.remove("isRunning");
+    return;
+    }
+    
     const current = getCurrentOccurrence(session);
 
     const timerLine = document.getElementById("TimerLine");
@@ -993,6 +1074,42 @@ function buildRepeat(type, container) {
   return { type: "none" };
 }
 
+async function finalizeDay() {
+  const session = AppState.data.activeDaySession;
+  if (!session?.remoteId || AppState.isSaving) return;
+
+  const total = session.plan?.length ?? 0;
+  const doneCount = Object.values(session.doneByOccId ?? {}).filter(Boolean).length;
+
+  const ok = await openConfirmModal({
+    title: "Finalizar día",
+    body:
+      `Día activo: ${session.dayKey}\n` +
+      `Progreso: ${doneCount}/${total}\n\n` +
+      `Esto cerrará la sesión y borrará el progreso del día en MockAPI.`,
+    okText: "Sí, finalizar",
+    cancelText: "Cancelar"
+  });
+
+  if (!ok) return;
+
+  AppState.isSaving = true;
+  render();
+
+  try {
+    clearTimeout(pendingSessionSaveTimer);
+    await Api.deleteRecurrence(session.remoteId);
+    AppState.data.activeDaySession = null;
+    showToastLikeNotice("Día finalizado ✅");
+  } catch (err) {
+    console.error(err);
+    showToastLikeNotice("No se pudo finalizar el día en MockAPI.");
+  } finally {
+    AppState.isSaving = false;
+    render();
+  }
+}
+
 /* -------------------------
    API helpers
 -------------------------- */
@@ -1004,6 +1121,56 @@ async function safeDeleteRecurrence(id) {
 /* -------------------------
    Avisos y helpers
 -------------------------- */
+
+let confirmResolve = null;
+
+function openConfirmModal({ title, body, okText = "Confirmar", cancelText = "Cancelar" }) {
+  Dom.ConfirmTitle.textContent = title;
+  Dom.ConfirmBody.textContent = body;
+  Dom.ConfirmOkBtn.textContent = okText;
+  Dom.ConfirmCancelBtn.textContent = cancelText;
+
+  Dom.ConfirmOverlay.hidden = false;
+  Dom.ConfirmModal.hidden = false;
+
+  // Focus al botón seguro por defecto
+  setTimeout(() => Dom.ConfirmCancelBtn.focus(), 0);
+
+  return new Promise(resolve => {
+    confirmResolve = resolve;
+  });
+}
+
+function closeConfirmModal(result) {
+  Dom.ConfirmOverlay.hidden = true;
+  Dom.ConfirmModal.hidden = true;
+
+  if (confirmResolve) {
+    const r = confirmResolve;
+    confirmResolve = null;
+    r(result);
+  }
+}
+
+function wireConfirmModalOnce() {
+  // Evita dobles bindings
+  if (wireConfirmModalOnce._wired) return;
+  wireConfirmModalOnce._wired = true;
+
+  Dom.ConfirmOverlay.addEventListener("click", () => closeConfirmModal(false));
+  Dom.ConfirmCloseBtn.addEventListener("click", () => closeConfirmModal(false));
+  Dom.ConfirmCancelBtn.addEventListener("click", () => closeConfirmModal(false));
+  Dom.ConfirmOkBtn.addEventListener("click", () => closeConfirmModal(true));
+
+  window.addEventListener("keydown", (e) => {
+    if (Dom.ConfirmModal.hidden) return;
+
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeConfirmModal(false);
+    }
+  });
+}
 
 function showToastLikeNotice(message) {
   Dom.ActiveSession.classList.add("isVisible");
