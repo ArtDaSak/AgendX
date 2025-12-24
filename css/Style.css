@@ -564,3 +564,176 @@ textarea{ resize: none; }
     background: rgba(235,235,255,.03);
     border-radius: var(--radius);
 }
+
+/* =========================
+   Desktop Responsive Upgrade
+   ========================= */
+
+@media (min-width: 900px){
+    :root{
+        --max: 1120px;
+    }
+
+    .TopBar{
+        padding: 18px 18px;
+    }
+
+    .BrandText h1{
+        font-size: 28px;
+    }
+
+    .BrandText p{
+        font-size: 13px;
+    }
+
+    .Main{
+        max-width: var(--max);
+        margin: 0 auto;
+        padding: 18px;
+        gap: 14px;
+
+        /* ✅ 2 columnas */
+        display: grid;
+        grid-template-columns: minmax(540px, 1fr) 380px;
+        grid-template-areas:
+            "tabs tabs"
+            "list session";
+        align-items: start;
+    }
+
+    .Tabs{
+        grid-area: tabs;
+
+        /* ✅ Tabs estilo desktop */
+        width: fit-content;
+        grid-template-columns: repeat(3, auto);
+        padding: 8px;
+        border: 1px solid var(--stroke);
+        border-radius: 999px;
+        background: rgba(235,235,255,.03);
+        gap: 8px;
+    }
+
+    .TabBtn{
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+
+    #ListCard{
+        grid-area: list;
+    }
+
+    .ActiveSession{
+        grid-area: session;
+
+        /* ✅ Panel sticky en desktop */
+        position: sticky;
+        top: 92px;
+        align-self: start;
+    }
+
+    .ActiveSession.isVisible{
+        display: grid;
+    }
+
+    .CardHeader{
+        padding: 16px 16px 12px;
+    }
+
+    .CardHeader h2{
+        font-size: 20px;
+    }
+
+    .InlineControls{
+        gap: 10px;
+    }
+
+    /* ✅ Lista más “desktop”: más compacta y con mejor lectura */
+    .List{
+        padding: 14px;
+        gap: 12px;
+    }
+
+    .Row{
+        padding: 14px;
+        gap: 10px;
+    }
+
+    .TitleLine strong{
+        font-size: 15px;
+    }
+
+    .NotesMd{
+        font-size: 12.5px;
+        max-width: 68ch; /* más legible en desktop */
+    }
+
+    .RowActions{
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .PrimaryBtn,
+    .GhostBtn,
+    .DangerBtn{
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+
+    .IconBtn{
+        width: 42px;
+        height: 42px;
+    }
+
+    /* ✅ Event Sheet como modal centrado en desktop */
+    .Sheet{
+        left: 50%;
+        right: auto;
+        top: 50%;
+        bottom: auto;
+        transform: translate(-50%, -50%);
+        width: min(720px, calc(100vw - 48px));
+        max-width: none;
+        border-radius: 24px;
+    }
+
+    .SheetHeader h3{
+        font-size: 20px;
+    }
+
+    input, textarea, select{
+        font-size: 14px;
+    }
+
+    textarea{
+        min-height: 90px;
+    }
+
+    /* ✅ Confirm modal un poquito más grande en desktop */
+    .Modal{
+        width: min(560px, calc(100vw - 48px));
+    }
+
+    .ModalHeader h3{
+        font-size: 20px;
+    }
+
+    /* ✅ Temporizador con más presencia */
+    .TimerLine .MainLine span{
+        font-size: 20px;
+    }
+}
+
+@media (min-width: 1200px){
+    .Main{
+        grid-template-columns: minmax(680px, 1fr) 420px;
+    }
+
+    .ActiveSession{
+        top: 96px;
+    }
+
+    .BrandText h1{
+        font-size: 30px;
+    }
+}
