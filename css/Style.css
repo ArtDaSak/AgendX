@@ -1,4 +1,5 @@
 :root{
+    /* CSS HEX */
     --lavender: #ebebff;
     --velvet-orchid: #711c91;
     --vivid-orchid: #ea00d9;
@@ -19,14 +20,24 @@
     --titleFont: "Iceland", ui-sans-serif, system-ui;
 }
 
-*{ box-sizing: border-box; }
-html, body{ height: 100%; }
+*{
+    box-sizing: border-box;
+}
+
+html, body{
+    height: 100%;
+}
+
 body{
     margin: 0;
     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-    background: radial-gradient(1200px 600px at 40% -20%, rgba(234,0,217,.22), transparent 55%),
-                radial-gradient(1000px 500px at 90% 10%, rgba(10,189,198,.18), transparent 55%),
-                var(--bg);
+
+    /* ✅ Mobile: con gradiente */
+    background:
+        radial-gradient(1200px 600px at 40% -20%, rgba(234,0,217,.22), transparent 55%),
+        radial-gradient(1000px 500px at 90% 10%, rgba(10,189,198,.18), transparent 55%),
+        var(--bg);
+
     color: var(--text);
 }
 
@@ -42,7 +53,7 @@ button{
     touch-action: manipulation;
 }
 
-.topBar{
+.TopBar{
     position: sticky;
     top: 0;
     z-index: 20;
@@ -56,62 +67,40 @@ button{
     gap: 12px;
 }
 
-.brand {
+.Brand{
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
 }
 
-.brandMark {
+.LogoMark{
     width: 44px;
     height: 44px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, var(--vivid-orchid), var(--strong-cyan), var(--velvet-orchid));
     display: grid;
     place-items: center;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(234,0,217,.95), rgba(10,189,198,.80), rgba(113,28,145,.85));
+    box-shadow: 0 0 0 6px rgba(234,0,217,.08);
+    border: 1px solid rgba(235,235,255,.18);
+    flex: 0 0 auto;
 }
 
-.brandMark svg {
+.LogoMark svg{
     width: 22px;
     height: 22px;
     stroke: var(--lavender);
 }
 
-.brandText{
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.brandNameRow{
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.brandName {
-    font-family: "Iceland", system-ui, sans-serif;
-    font-size: 34px;
-    line-height: 1;
+.BrandText h1{
+    font-size: 26px;
     margin: 0;
 }
 
-.brandTagline {
-    margin: 6px 0 0 0;
-    opacity: 0.9;
-    font-size: 13px; /* Ensure logical default */
+.BrandText p{
+    font-size: 12px;
+    margin: 2px 0 0 0;
     color: var(--muted);
-}
-
-.uHidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    clip-path: inset(50%);
 }
 
 .Main{
@@ -134,7 +123,7 @@ button{
     color: var(--text);
     padding: 10px 12px;
     border-radius: 999px;
-    font-weight: 800;
+    font-weight: 900;
 }
 
 .TabBtn.isActive{
@@ -159,7 +148,10 @@ button{
     border-bottom: 1px solid var(--stroke);
 }
 
-.CardHeader h2{ margin: 0; font-size: 18px; }
+.CardHeader h2{
+    margin: 0;
+    font-size: 18px;
+}
 
 .InlineControls{
     display: flex;
@@ -169,7 +161,6 @@ button{
     justify-content: flex-end;
 }
 
-/* ✅ LISTA SIEMPRE 1 COLUMNA (NO GRID) */
 .List{
     padding: 10px;
     display: flex;
@@ -195,9 +186,12 @@ button{
     display: flex;
     justify-content: space-between;
     gap: 10px;
+    align-items: center;
 }
 
-.TitleLine{ min-width: 0; }
+.TitleLine{
+    min-width: 0;
+}
 
 .TitleLine strong{
     display: block;
@@ -212,62 +206,49 @@ button{
     font-size: 12px;
 }
 
-.NotesMd{
-    display: block;
-    color: rgba(235,235,255,.74);
-    font-size: 12px;
-    line-height: 1.35;
-}
-
-.NotesMd a{
-    color: rgba(10,189,198,.85);
-    text-decoration: none;
-    border-bottom: 1px solid rgba(10,189,198,.35);
-}
-
-.NotesMd a:hover{
-    border-bottom-color: rgba(10,189,198,.70);
-}
-
-.NotesMd code{
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 10px;
-    border: 1px solid rgba(235,235,255,.16);
-    background: rgba(235,235,255,.05);
-    color: rgba(235,235,255,.88);
-}
-
-.NotesMd ul{
-    margin: 6px 0 0 18px;
-    padding: 0;
-}
-
-.NotesMd li{
-    margin: 2px 0;
-}
-
 .Badges{
     display: flex;
-    gap: 6px;
+    gap: 8px;
     flex-wrap: wrap;
     justify-content: flex-end;
+    align-items: center;
 }
 
 .Badge{
     font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 999px;
+    padding: 6px 10px;
+
+    border-radius: 10px;
     border: 1px solid var(--stroke);
     color: var(--text);
     background: rgba(19,62,124,.18);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    text-align: center;
 }
 
-.Badge.isAccent{ border-color: rgba(234,0,217,.30); background: rgba(234,0,217,.12); }
-.Badge.isCyan{ border-color: rgba(10,189,198,.30); background: rgba(10,189,198,.12); }
-.Badge.isWarn{ border-color: rgba(235,235,255,.30); background: rgba(235,235,255,.10); }
-.Badge.isDone{ border-color: rgba(10,189,198,.40); background: rgba(10,189,198,.18); }
+.Badge.isAccent{
+    border-color: rgba(234,0,217,.30);
+    background: rgba(234,0,217,.12);
+}
+
+.Badge.isCyan{
+    border-color: rgba(10,189,198,.30);
+    background: rgba(10,189,198,.12);
+}
+
+.Badge.isWarn{
+    border-color: rgba(235,235,255,.26);
+    background: rgba(235,235,255,.08);
+}
+
+.Badge.isDone{
+    border-color: rgba(10,189,198,.40);
+    background: rgba(10,189,198,.18);
+}
 
 .RowActions{
     display: flex;
@@ -310,11 +291,6 @@ button{
     box-shadow: 0 0 0 6px rgba(234,0,217,.06);
 }
 
-.DangerBtn:hover{
-    background: rgba(234,0,217,.28);
-    border-color: rgba(234,0,217,.48);
-}
-
 .PrimaryBtn:disabled,
 .GhostBtn:disabled,
 .DangerBtn:disabled{
@@ -337,11 +313,13 @@ button{
 }
 
 .ActiveSession strong{
-    font-size: 16px;
+    font-size: 18px;
     font-family: var(--titleFont);
 }
 
-.ActiveSession small{ color: var(--muted); }
+.ActiveSession small{
+    color: var(--muted);
+}
 
 .TimerLine{
     border: 1px solid rgba(235,235,255,.16);
@@ -366,23 +344,21 @@ button{
 
 .TimerLine .SubLine{
     font-size: 12px;
-    color: rgba(235,235,255,.72);
+    color: rgba(235,235,255,.68);
 }
 
 .TimerLine .SubLine div{
     margin-top: 4px;
 }
 
-.TimerLine.isRunning .MainLine span{
-    color: rgba(235, 235, 255, 0.86);
-}
-
 .TimerLine.isRunning #TimerRemain{
     color: rgba(10, 189, 198, 0.78);
 }
 
-.TimerLine.isRunning .SubLine{
-    color: rgba(235, 235, 255, 0.68);
+.UiIcon svg{
+    width: 18px;
+    height: 18px;
+    stroke: var(--lavender);
 }
 
 .Overlay{
@@ -418,7 +394,6 @@ button{
 .SheetHeader h3{
     margin: 0;
     font-size: 18px;
-    font-family: var(--titleFont);
 }
 
 .SheetBody{
@@ -427,9 +402,21 @@ button{
     gap: 12px;
 }
 
-.Field{ display: grid; gap: 6px; }
-.Field span{ font-size: 12px; color: var(--muted); font-weight: 900; }
-.Field small{ font-size: 11px; color: rgba(235,235,255,.62); }
+.Field{
+    display: grid;
+    gap: 6px;
+}
+
+.Field span{
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 900;
+}
+
+.Field small{
+    font-size: 11px;
+    color: rgba(235,235,255,.62);
+}
 
 input, textarea, select{
     width: 100%;
@@ -441,7 +428,9 @@ input, textarea, select{
     outline: none;
 }
 
-textarea{ resize: none; }
+textarea{
+    resize: none;
+}
 
 .Grid2{
     display: grid;
@@ -450,7 +439,9 @@ textarea{ resize: none; }
 }
 
 @media (max-width: 420px){
-    .Grid2{ grid-template-columns: 1fr; }
+    .Grid2{
+        grid-template-columns: 1fr;
+    }
 }
 
 .RepeatConfig{
@@ -472,7 +463,7 @@ textarea{ resize: none; }
     align-items: center;
     gap: 6px;
     padding: 8px 10px;
-    border-radius: 999px;
+    border-radius: 12px;
     border: 1px solid var(--stroke);
     background: rgba(235,235,255,.04);
     font-size: 12px;
@@ -484,7 +475,9 @@ textarea{ resize: none; }
     align-items: center;
 }
 
-.Spacer{ flex: 1; }
+.Spacer{
+    flex: 1;
+}
 
 .Empty{
     text-align: center;
@@ -510,13 +503,103 @@ textarea{ resize: none; }
     gap: 4px;
 }
 
-.HintBox strong{ font-family: var(--titleFont); font-size: 14px; }
-.HintBox small{ color: rgba(235,235,255,.72); }
+.HintBox strong{
+    font-family: var(--titleFont);
+    font-size: 14px;
+}
 
-/* -------------------------
-   Confirm Modal
--------------------------- */
+.HintBox small{
+    color: rgba(235,235,255,.72);
+}
 
+.SelectBtn{
+    width: 100%;
+    padding: 12px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--stroke);
+    background: rgba(235,235,255,.03);
+    color: var(--text);
+    text-align: left;
+    font-weight: 900;
+}
+
+.InlineField{
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.UnitBtn{
+    min-width: 62px;
+    text-align: center;
+    font-weight: 900;
+}
+
+/* Markdown */
+.NotesMd{
+    display: block;
+    color: rgba(235,235,255,.74);
+    font-size: 12px;
+    line-height: 1.35;
+    margin-top: 6px;
+}
+
+.NotesMd a{
+    color: rgba(10,189,198,.85);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(10,189,198,.35);
+}
+
+.NotesMd code{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(235,235,255,.16);
+    background: rgba(235,235,255,.05);
+    color: rgba(235,235,255,.88);
+}
+
+.NotesMd ul{
+    margin: 6px 0 0 18px;
+    padding: 0;
+}
+
+.NotesMd li{
+    margin: 2px 0;
+}
+
+/* Drag & Drop */
+.DragHandle{
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    border: 1px solid rgba(235,235,255,.16);
+    background: rgba(235,235,255,.05);
+    color: rgba(235,235,255,.86);
+    display: grid;
+    place-items: center;
+    font-size: 22px;    /* tamaño OK */
+    font-weight: 600;  /* ✅ menos “grosor” visual */
+    line-height: 1;
+    user-select: none;
+    touch-action: none;
+}
+
+.Row.isDragging{
+    opacity: .88;
+    border-color: rgba(234,0,217,.40);
+    box-shadow: 0 0 0 6px rgba(234,0,217,.08);
+}
+
+.RowPlaceholder{
+    border: 1px dashed rgba(235,235,255,.22);
+    background: rgba(235,235,255,.03);
+    border-radius: var(--radius);
+}
+
+/* Modals */
 .ModalOverlay{
     position: fixed;
     inset: 0;
@@ -548,9 +631,7 @@ textarea{ resize: none; }
 
 .ModalHeader h3{
     margin: 0;
-    font-family: var(--titleFont);
     font-size: 18px;
-    letter-spacing: .8px;
 }
 
 .ModalBody{
@@ -569,40 +650,25 @@ textarea{ resize: none; }
     border-top: 1px solid rgba(235,235,255,.12);
 }
 
-.DragHandle{
-    width: 42px;
-    height: 42px;
-    border-radius: 999px;
-    border: 1px solid rgba(235,235,255,.16);
-    background: rgba(235,235,255,.05);
-    color: rgba(235,235,255,.86);
-    display: grid;
-    place-items: center;
-    font-size: 18px;
-    user-select: none;
-    touch-action: none; /* ✅ clave para drag en móvil */
+.uHidden{
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
 }
 
-.Row.isDragging{
-    opacity: .85;
-    transform: scale(0.995);
-    border-color: rgba(234,0,217,.40);
-    box-shadow: 0 0 0 6px rgba(234,0,217,.08);
-}
-
-.RowPlaceholder{
-    border: 1px dashed rgba(235,235,255,.22);
-    background: rgba(235,235,255,.03);
-    border-radius: var(--radius);
-}
-
-/* =========================
-   Desktop Responsive Upgrade
-   ========================= */
-
+/* Desktop upgrade */
 @media (min-width: 900px){
     :root{
         --max: 1120px;
+    }
+
+    /* ✅ Desktop: SIN gradiente (solo color sólido) */
+    body{
+        background: var(--bg);
     }
 
     .TopBar{
@@ -610,11 +676,7 @@ textarea{ resize: none; }
     }
 
     .BrandText h1{
-        font-size: 28px;
-    }
-
-    .BrandText p{
-        font-size: 13px;
+        font-size: 30px;
     }
 
     .Main{
@@ -623,7 +685,6 @@ textarea{ resize: none; }
         padding: 18px;
         gap: 14px;
 
-        /* ✅ 2 columnas */
         display: grid;
         grid-template-columns: minmax(540px, 1fr) 380px;
         grid-template-areas:
@@ -634,8 +695,6 @@ textarea{ resize: none; }
 
     .Tabs{
         grid-area: tabs;
-
-        /* ✅ Tabs estilo desktop */
         width: fit-content;
         grid-template-columns: repeat(3, auto);
         padding: 8px;
@@ -645,78 +704,17 @@ textarea{ resize: none; }
         gap: 8px;
     }
 
-    .TabBtn{
-        padding: 10px 14px;
-        font-size: 13px;
-    }
-
     #ListCard{
         grid-area: list;
     }
 
     .ActiveSession{
         grid-area: session;
-
-        /* ✅ Panel sticky en desktop */
         position: sticky;
         top: 92px;
         align-self: start;
     }
 
-    .ActiveSession.isVisible{
-        display: grid;
-    }
-
-    .CardHeader{
-        padding: 16px 16px 12px;
-    }
-
-    .CardHeader h2{
-        font-size: 20px;
-    }
-
-    .InlineControls{
-        gap: 10px;
-    }
-
-    /* ✅ Lista más “desktop”: más compacta y con mejor lectura */
-    .List{
-        padding: 14px;
-        gap: 12px;
-    }
-
-    .Row{
-        padding: 14px;
-        gap: 10px;
-    }
-
-    .TitleLine strong{
-        font-size: 15px;
-    }
-
-    .NotesMd{
-        font-size: 12.5px;
-        max-width: 68ch; /* más legible en desktop */
-    }
-
-    .RowActions{
-        justify-content: flex-end;
-        gap: 10px;
-    }
-
-    .PrimaryBtn,
-    .GhostBtn,
-    .DangerBtn{
-        padding: 10px 14px;
-        font-size: 13px;
-    }
-
-    .IconBtn{
-        width: 42px;
-        height: 42px;
-    }
-
-    /* ✅ Event Sheet como modal centrado en desktop */
     .Sheet{
         left: 50%;
         right: auto;
@@ -726,45 +724,5 @@ textarea{ resize: none; }
         width: min(720px, calc(100vw - 48px));
         max-width: none;
         border-radius: 24px;
-    }
-
-    .SheetHeader h3{
-        font-size: 20px;
-    }
-
-    input, textarea, select{
-        font-size: 14px;
-    }
-
-    textarea{
-        min-height: 90px;
-    }
-
-    /* ✅ Confirm modal un poquito más grande en desktop */
-    .Modal{
-        width: min(560px, calc(100vw - 48px));
-    }
-
-    .ModalHeader h3{
-        font-size: 20px;
-    }
-
-    /* ✅ Temporizador con más presencia */
-    .TimerLine .MainLine span{
-        font-size: 20px;
-    }
-}
-
-@media (min-width: 1200px){
-    .Main{
-        grid-template-columns: minmax(680px, 1fr) 420px;
-    }
-
-    .ActiveSession{
-        top: 96px;
-    }
-
-    .BrandText h1{
-        font-size: 30px;
     }
 }

@@ -2,40 +2,34 @@
 <html lang="es">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#091833" />
         <title>AgendX</title>
 
-        <!-- Fuente títulos -->
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Iceland&display=swap" rel="stylesheet" />
 
-        <!-- Favicon (se reemplaza dinámicamente en runtime con el gradiente) -->
+        <!-- Favicon placeholder (se reemplaza dinámicamente con SVG gradiente basado en Lucide) -->
         <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" />
 
-        <link rel="stylesheet" href="css/Style.css" />
+        <link rel="stylesheet" href="./css/Style.css" />
     </head>
 
     <body>
-        <header class="topBar">
-            <div class="brand">
-                <div class="brandMark" aria-hidden="true" title="AgendX">
+        <header class="TopBar">
+            <div class="Brand">
+                <div class="LogoMark" aria-hidden="true" title="AgendX">
                     <i data-lucide="calendar-range"></i>
                 </div>
 
-                <div class="brandText">
-                    <div class="brandNameRow">
-                        <h1 class="brandName">AgendX</h1>
-                    </div>
-
-                    <p class="brandTagline">Es tu día, ve a tu ritmo 😼</p>
+                <div class="BrandText">
+                    <h1>AgendX</h1>
+                    <p>Es tu día, ve a tu ritmo 😼</p>
                 </div>
             </div>
 
-            <div class="topBarActions" id="topBarActions">
-                <button class="PrimaryBtn" id="OpenCreateBtn" type="button">+ Agregar</button>
-            </div>
+            <button class="PrimaryBtn" id="OpenCreateBtn" type="button">+ Agregar</button>
         </header>
 
         <main class="Main">
@@ -63,8 +57,10 @@
             </section>
         </main>
 
+        <!-- Overlay general (Sheet) -->
         <div class="Overlay" id="Overlay" hidden></div>
 
+        <!-- Sheet Agregar/Editar -->
         <section class="Sheet" id="EventSheet" hidden aria-modal="true" role="dialog" aria-labelledby="EventSheetTitle">
             <header class="SheetHeader">
                 <h3 id="EventSheetTitle">Agregar evento</h3>
@@ -77,49 +73,46 @@
                 <div class="Grid2">
                     <label class="Field">
                         <span>Tipo</span>
-                        <select id="EventKind">
-                            <option value="event">Evento</option>
-                            <option value="rest">Descanso</option>
-                        </select>
+                        <input type="hidden" id="EventKind" value="event" />
+                        <button class="SelectBtn" id="EventKindBtn" type="button">Evento</button>
                     </label>
 
                     <label class="Field">
                         <span>Rango (prioridad)</span>
-                        <input id="RangeOrderInput" type="number" min="1" step="1" value="10" required />
+                        <input id="RangeOrderInput" type="number" min="1" step="1" value="1" required />
                     </label>
                 </div>
 
                 <div id="TitleWrap">
                     <label class="Field">
                         <span>Título</span>
-                        <input id="TitleInput" required maxlength="60" placeholder="Ej. Estudiar JavaScript" />
+                        <input id="TitleInput" required maxlength="60" placeholder="Ej. Pausa activa" />
                     </label>
                 </div>
 
                 <label class="Field">
-                    <span>Tiempo (min)</span>
-                    <input id="DurationInput" type="number" min="0" step="5" placeholder="Ej. 45" />
-                    <small>Se usa para el temporizador en tiempo real</small>
+                    <span>Tiempo</span>
+
+                    <div class="InlineField">
+                        <input id="DurationInput" type="number" min="1" max="1440" step="1" placeholder="Ej. 45" />
+                        <button class="GhostBtn UnitBtn" id="DurationUnitBtn" type="button">min</button>
+                    </div>
+
+                    <small id="DurationHelp">Mínimo 1 minuto, máximo 1440 minutos</small>
                 </label>
 
                 <div id="NotesWrap">
                     <label class="Field">
-                        <span>Notas (Markdown)</span>
-                        <textarea id="NotesInput" rows="2" maxlength="600" placeholder="- Lista&#10;**negrita**&#10;[link](https://...)"></textarea>
+                        <span>Notas</span>
+                        <textarea id="NotesInput" rows="2" maxlength="600" placeholder="Escribe aquí tu nota con formato Markdown"></textarea>
                     </label>
                 </div>
 
                 <div class="Grid2">
                     <label class="Field">
                         <span>Repetición</span>
-                        <select id="RepeatType">
-                            <option value="none">Ninguna</option>
-                            <option value="daily">Diaria</option>
-                            <option value="weekly">Semanal</option>
-                            <option value="monthly">Mensual</option>
-                            <option value="interval">Cada N días</option>
-                            <option value="dates">Fechas específicas</option>
-                        </select>
+                        <input type="hidden" id="RepeatType" value="none" />
+                        <button class="SelectBtn" id="RepeatTypeBtn" type="button">Único</button>
                     </label>
 
                     <label class="Field">
@@ -146,7 +139,6 @@
 
         <!-- Confirm Modal -->
         <div class="ModalOverlay" id="ConfirmOverlay" hidden></div>
-
         <section class="Modal" id="ConfirmModal" hidden role="dialog" aria-modal="true" aria-labelledby="ConfirmTitle">
             <header class="ModalHeader">
                 <h3 id="ConfirmTitle">Confirmación</h3>
@@ -161,15 +153,30 @@
             </footer>
         </section>
 
-        <!-- Fuente del SVG para construir el favicon con gradiente (oculto) -->
-        <div id="faviconSource" class="uHidden" aria-hidden="true" style="display:none">
+        <!-- Picker Modal (selects custom) -->
+        <div class="ModalOverlay" id="PickerOverlay" hidden></div>
+        <section class="Modal" id="PickerModal" hidden role="dialog" aria-modal="true" aria-labelledby="PickerTitle">
+            <header class="ModalHeader">
+                <h3 id="PickerTitle">Seleccionar</h3>
+                <button class="IconBtn" id="PickerCloseBtn" type="button" aria-label="Cerrar">✕</button>
+            </header>
+
+            <div class="ModalBody" id="PickerBody"></div>
+
+            <footer class="ModalFooter">
+                <button class="GhostBtn" id="PickerCancelBtn" type="button">Cancelar</button>
+            </footer>
+        </section>
+
+        <!-- Icono oculto para construir favicon con el mismo vector -->
+        <div id="faviconSource" class="uHidden" aria-hidden="true">
             <i data-lucide="calendar-range"></i>
         </div>
 
-        <!-- Lucide (vanilla) -->
+        <!-- Lucide UMD (vanilla) -->
         <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 
-        <!-- Tu app -->
+        <!-- App -->
         <script type="module" src="./js/App.js"></script>
     </body>
 </html>

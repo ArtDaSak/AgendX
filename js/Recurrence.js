@@ -3,8 +3,8 @@ import { DateUtils } from "./DateUtils.js";
 export const Recurrence = {
     buildOccurrences(events, startDate, endDate) {
         const startKey = DateUtils.toLocalDateKey(startDate);
-        const days = [];
 
+        const days = [];
         for (let d = DateUtils.fromLocalDateKey(startKey); d <= endDate; d = DateUtils.addDays(d, 1)) {
             days.push(DateUtils.toLocalDateKey(d));
         }
@@ -48,12 +48,6 @@ export const Recurrence = {
     },
 
     matches(event, dayKey) {
-        const weekdayFilter = Array.isArray(event.weekdayFilter) ? event.weekdayFilter : [];
-        if (weekdayFilter.length > 0) {
-            const weekday = DateUtils.fromLocalDateKey(dayKey).getDay();
-            if (!weekdayFilter.includes(weekday)) return false;
-        }
-
         const type = event.repeat?.type ?? "none";
 
         if (type === "none") return event.startOn === dayKey;

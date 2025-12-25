@@ -2,15 +2,51 @@ import { Api } from "./Storage.js";
 import { Recurrence } from "./Recurrence.js";
 import { DateUtils } from "./DateUtils.js";
 
+/*
+    AgendX V1
+    - Vanilla + MockAPI (events, recurrences)
+    - Tema oscuro, mobile-first
+    - Agenda por rangos (sin horas fijas)
+    - Día iniciado con progreso por rango y temporizador en tiempo real
+    - Drag & Drop para reordenar (auto-gestiona prioridades)
+    - Dropdowns custom con modal (Picker)
+    - Notas renderizadas como Markdown (después de guardar)
+    - Confirmación para eliminar rango y finalizar día
+    - Recalcula plan si se edita/elimina evento con día iniciado
+    - Sustituye solo ⚠️ y ✅ por iconos Lucide
+    - Indentación 4 espacios
+*/
+
 const AppState = {
     view: "today",
     anchorDate: new Date(),
     isHydrated: false,
     isSaving: false,
     actionLockUntil: 0,
+
     data: {
         events: [],
         activeDaySession: null
+    }
+};
+
+const UiState = {
+    durationUnit: "min",
+    drag: {
+        isActive: false,
+        pointerId: null,
+        dragRow: null,
+        placeholder: null
+    },
+
+    confirm: {
+        isOpen: false,
+        resolve: null
+    },
+
+    picker: {
+        isOpen: false,
+        resolve: null
     }
 };
 
@@ -40,14 +76,22 @@ const Dom = {
 
     EventId: document.getElementById("EventId"),
     EventKind: document.getElementById("EventKind"),
+    EventKindBtn: document.getElementById("EventKindBtn"),
+
+    RangeOrderInput: document.getElementById("RangeOrderInput"),
     TitleWrap: document.getElementById("TitleWrap"),
     NotesWrap: document.getElementById("NotesWrap"),
     TitleInput: document.getElementById("TitleInput"),
-    RangeOrderInput: document.getElementById("RangeOrderInput"),
+
     DurationInput: document.getElementById("DurationInput"),
+    DurationUnitBtn: document.getElementById("DurationUnitBtn"),
+    DurationHelp: document.getElementById("DurationHelp"),
+
     NotesInput: document.getElementById("NotesInput"),
-    RepeatType: document.getElementById("RepeatType"),
     StartOnInput: document.getElementById("StartOnInput"),
+
+    RepeatType: document.getElementById("RepeatType"),
+    RepeatTypeBtn: document.getElementById("RepeatTypeBtn"),
     RepeatConfig: document.getElementById("RepeatConfig"),
 
     ConfirmOverlay: document.getElementById("ConfirmOverlay"),
@@ -56,164 +100,27 @@ const Dom = {
     ConfirmBody: document.getElementById("ConfirmBody"),
     ConfirmCloseBtn: document.getElementById("ConfirmCloseBtn"),
     ConfirmCancelBtn: document.getElementById("ConfirmCancelBtn"),
-    ConfirmOkBtn: document.getElementById("ConfirmOkBtn")
+    ConfirmOkBtn: document.getElementById("ConfirmOkBtn"),
+
+    PickerOverlay: document.getElementById("PickerOverlay"),
+    PickerModal: document.getElementById("PickerModal"),
+    PickerTitle: document.getElementById("PickerTitle"),
+    PickerBody: document.getElementById("PickerBody"),
+    PickerCloseBtn: document.getElementById("PickerCloseBtn"),
+    PickerCancelBtn: document.getElementById("PickerCancelBtn")
 };
 
 boot();
+
+/* -------------------------
+   Boot
+-------------------------- */
 
 async function boot() {
     AppState.anchorDate = new Date();
     AppState.anchorDate.setSeconds(0, 0);
 
     wireUi();
-    initLucideAndFavicon();
-    enableSortableIfNeeded();
-
-const SortState = {
-    dragging: false,
-    pointerId: null,
-    draggedEl: null,
-    placeholderEl: null,
-    startParent: null,
-    startNextSibling: null,
-    shiftY: 0,
-    widthPx: 0,
-    leftPx: 0
-};
-
-function enableSortableIfNeeded() {
-    Dom.OccurrenceList.addEventListener("pointerdown", onPointerDownSort, { passive: false });
-}
-
-function onPointerDownSort(e) {
-    const handle = e.target.closest("[data-drag-handle]");
-    if (!handle) return;
-
-    if (AppState.view !== "today") return;
-    if (AppState.isSaving) return;
-
-    const row = handle.closest(".Row");
-    if (!row) return;
-
-    e.preventDefault();
-
-    const rect = row.getBoundingClientRect();
-
-    SortState.dragging = true;
-    SortState.pointerId = e.pointerId;
-    SortState.draggedEl = row;
-
-    SortState.startParent = row.parentNode;
-    SortState.startNextSibling = row.nextSibling;
-
-    SortState.shiftY = e.clientY - rect.top;
-    SortState.widthPx = rect.width;
-    SortState.leftPx = rect.left;
-
-    // Placeholder con el mismo alto
-    const ph = document.createElement("div");
-    ph.className = "RowPlaceholder";
-    ph.style.height = `${rect.height}px`;
-    SortState.placeholderEl = ph;
-
-    // Inserta placeholder donde estaba el row
-    SortState.startParent.insertBefore(ph, row);
-
-    // “Despega” el row y lo mueve a fixed sobre la pantalla
-    row.classList.add("isDragging");
-    row.style.width = `${SortState.widthPx}px`;
-    row.style.position = "fixed";
-    row.style.left = `${SortState.leftPx}px`;
-    row.style.top = `${rect.top}px`;
-    row.style.zIndex = "9999";
-    row.style.pointerEvents = "none";
-
-    // Lo ponemos al final del body para que fixed sea confiable
-    document.body.appendChild(row);
-
-    row.setPointerCapture(e.pointerId);
-
-    window.addEventListener("pointermove", onPointerMoveSort, { passive: false });
-    window.addEventListener("pointerup", onPointerUpSort, { passive: false });
-}
-
-function onPointerMoveSort(e) {
-    if (!SortState.dragging) return;
-    if (e.pointerId !== SortState.pointerId) return;
-
-    e.preventDefault();
-
-    const row = SortState.draggedEl;
-    const ph = SortState.placeholderEl;
-    if (!row || !ph) return;
-
-    // Mueve el row con fixed siguiendo el dedo
-    const top = e.clientY - SortState.shiftY;
-    row.style.top = `${top}px`;
-
-    // Encuentra el row bajo el pointer (si existe)
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const targetRow = el ? el.closest(".Row") : null;
-
-    if (!targetRow) return;
-
-    // No reinsertar contra sí mismo (que está fuera del DOM de la lista)
-    if (!SortState.startParent.contains(targetRow)) return;
-
-    const r = targetRow.getBoundingClientRect();
-    const mid = r.top + r.height / 2;
-
-    // Inserta placeholder antes o después según el Y
-    if (e.clientY < mid) {
-        if (targetRow.previousSibling !== ph) {
-            SortState.startParent.insertBefore(ph, targetRow);
-        }
-    } else {
-        if (targetRow.nextSibling !== ph) {
-            SortState.startParent.insertBefore(ph, targetRow.nextSibling);
-        }
-    }
-}
-
-async function onPointerUpSort(e) {
-    if (!SortState.dragging) return;
-    if (e.pointerId !== SortState.pointerId) return;
-
-    e.preventDefault();
-
-    window.removeEventListener("pointermove", onPointerMoveSort);
-    window.removeEventListener("pointerup", onPointerUpSort);
-
-    const row = SortState.draggedEl;
-    const ph = SortState.placeholderEl;
-    const parent = SortState.startParent;
-
-    SortState.dragging = false;
-    SortState.pointerId = null;
-
-    if (!row || !ph || !parent) return;
-
-    // Devuelve el row al DOM en la posición del placeholder
-    row.classList.remove("isDragging");
-    row.style.position = "";
-    row.style.left = "";
-    row.style.top = "";
-    row.style.width = "";
-    row.style.zIndex = "";
-    row.style.pointerEvents = "";
-
-    parent.insertBefore(row, ph);
-    ph.remove();
-
-    SortState.draggedEl = null;
-    SortState.placeholderEl = null;
-    SortState.startParent = null;
-    SortState.startNextSibling = null;
-
-    // Persistir nuevo orden
-    await persistTodayOrderFromDom();
-}
-
     renderLoading();
 
     try {
@@ -221,18 +128,83 @@ async function onPointerUpSort(e) {
         AppState.isHydrated = true;
     } catch (err) {
         console.error(err);
-        showToastLikeNotice("No se pudo cargar MockAPI. Revisa tu URL o conexión.");
         AppState.isHydrated = true;
+        showToastLikeNotice("No se pudo cargar MockAPI. Revisa la URL o conexión.", "warn");
     }
+
+    initLucideAndFavicon();
 
     render();
 }
 
+function renderLoading() {
+    Dom.OccurrenceList.innerHTML = `<div class="Empty">Cargando…</div>`;
+    Dom.StartDayBtn.disabled = true;
+    Dom.OpenCreateBtn.disabled = true;
+}
+
 /* -------------------------
-   Locks de acción
+   Lucide helpers
 -------------------------- */
 
-function lockAction(ms = 450) {
+function refreshLucideIcons() {
+    if (window.lucide && typeof window.lucide.createIcons === "function") {
+        window.lucide.createIcons();
+    }
+}
+
+function initLucideAndFavicon() {
+    const tryInit = () => {
+        if (!window.lucide || typeof window.lucide.createIcons !== "function") {
+            requestAnimationFrame(tryInit);
+            return;
+        }
+
+        window.lucide.createIcons();
+
+        const sourceSvg = document.querySelector("#faviconSource svg");
+        if (!sourceSvg) return;
+
+        const iconInner = sourceSvg.innerHTML;
+
+        const faviconSvg = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <defs>
+                    <linearGradient id="agx" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#ea00d9"/>
+                        <stop offset="55%" stop-color="#0abdc6"/>
+                        <stop offset="100%" stop-color="#711c91"/>
+                    </linearGradient>
+                </defs>
+
+                <rect x="0" y="0" width="24" height="24" rx="5" fill="url(#agx)"/>
+                <g stroke="#ebebff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+                    ${iconInner}
+                </g>
+            </svg>
+        `.trim();
+
+        const href = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(faviconSvg);
+
+        let link = document.querySelector('link[rel="icon"]');
+        if (!link) {
+            link = document.createElement("link");
+            link.rel = "icon";
+            document.head.appendChild(link);
+        }
+
+        link.type = "image/svg+xml";
+        link.href = href;
+    };
+
+    tryInit();
+}
+
+/* -------------------------
+   Locks
+-------------------------- */
+
+function lockAction(ms = 350) {
     const now = Date.now();
     if (now < AppState.actionLockUntil) return false;
     AppState.actionLockUntil = now + ms;
@@ -240,7 +212,7 @@ function lockAction(ms = 450) {
 }
 
 /* -------------------------
-   Wire UI (sin listeners duplicados)
+   UI wiring
 -------------------------- */
 
 function wireUi() {
@@ -257,6 +229,7 @@ function wireUi() {
     Dom.NextBtn.addEventListener("click", () => shiftAnchor(1));
     Dom.TodayBtn.addEventListener("click", () => {
         AppState.anchorDate = new Date();
+        AppState.anchorDate.setSeconds(0, 0);
         render();
     });
 
@@ -267,13 +240,13 @@ function wireUi() {
     Dom.CancelEventBtn.addEventListener("click", closeEventSheet);
     Dom.Overlay.addEventListener("click", closeEventSheet);
 
-    Dom.RepeatType.addEventListener("change", () => renderRepeatConfig(Dom.RepeatConfig, Dom.RepeatType.value, null));
-    Dom.EventKind.addEventListener("change", applyKindUI);
+    Dom.EventKindBtn.addEventListener("click", onPickKind);
+    Dom.RepeatTypeBtn.addEventListener("click", onPickRepeat);
+    Dom.DurationUnitBtn.addEventListener("click", onToggleDurationUnit);
 
     Dom.EventForm.addEventListener("submit", onSubmitEvent);
     Dom.DeleteBtn.addEventListener("click", onDeleteEvent);
 
-    /* ✅ Event delegation para lista */
     Dom.OccurrenceList.addEventListener("click", (e) => {
         const btn = e.target.closest("button");
         if (!btn) return;
@@ -282,7 +255,7 @@ function wireUi() {
         const toggleId = btn.dataset.toggleDone;
 
         if (editId) {
-            const found = AppState.data.events.find(ev => ev.id === editId);
+            const found = AppState.data.events.find(ev => String(ev.id) === String(editId));
             if (found) openEventSheetForEdit(found);
             return;
         }
@@ -292,7 +265,6 @@ function wireUi() {
         }
     });
 
-    /* ✅ Event delegation para sesión activa */
     Dom.ActiveSession.addEventListener("click", (e) => {
         const btn = e.target.closest("button");
         if (!btn) return;
@@ -316,69 +288,48 @@ function wireUi() {
     });
 
     wireConfirmModalOnce();
+    wirePickerModalOnce();
+    enableSortablePointerDnD();
 }
 
 /* -------------------------
-   Modal confirmación
+   Range by view
 -------------------------- */
 
-let confirmResolve = null;
+function computeRange() {
+    const anchor = new Date(AppState.anchorDate);
+    anchor.setHours(0, 0, 0, 0);
 
-function openConfirmModal({ title, body, okText = "Confirmar", cancelText = "Cancelar" }) {
-    Dom.ConfirmTitle.textContent = title;
-    Dom.ConfirmBody.textContent = body;
-    Dom.ConfirmOkBtn.textContent = okText;
-    Dom.ConfirmCancelBtn.textContent = cancelText;
-
-    Dom.ConfirmOverlay.hidden = false;
-    Dom.ConfirmModal.hidden = false;
-
-    setTimeout(() => Dom.ConfirmCancelBtn.focus(), 0);
-
-    return new Promise(resolve => {
-        confirmResolve = resolve;
-    });
-}
-
-function closeConfirmModal(result) {
-    Dom.ConfirmOverlay.hidden = true;
-    Dom.ConfirmModal.hidden = true;
-
-    if (confirmResolve) {
-        const r = confirmResolve;
-        confirmResolve = null;
-        r(result);
+    if (AppState.view === "today") {
+        const start = new Date(anchor);
+        const end = new Date(anchor);
+        end.setHours(23, 59, 59, 999);
+        return { rangeStart: start, rangeEnd: end, title: `Día · ${DateUtils.formatHumanDate(anchor)}` };
     }
+
+    if (AppState.view === "week") {
+        const start = DateUtils.startOfWeek(anchor);
+        const end = DateUtils.endOfWeek(anchor);
+        return { rangeStart: start, rangeEnd: end, title: `Semana · ${DateUtils.formatHumanDate(start)} → ${DateUtils.formatHumanDate(end)}` };
+    }
+
+    const start = DateUtils.addDays(anchor, -14);
+    const end = DateUtils.addDays(anchor, 30);
+    end.setHours(23, 59, 59, 999);
+    return { rangeStart: start, rangeEnd: end, title: `Todo · ${DateUtils.formatHumanDate(start)} → ${DateUtils.formatHumanDate(end)}` };
 }
 
-function wireConfirmModalOnce() {
-    if (wireConfirmModalOnce._wired) return;
-    wireConfirmModalOnce._wired = true;
+function shiftAnchor(direction) {
+    if (AppState.view === "today") AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction);
+    else if (AppState.view === "week") AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 7);
+    else AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 30);
 
-    Dom.ConfirmOverlay.addEventListener("click", () => closeConfirmModal(false));
-    Dom.ConfirmCloseBtn.addEventListener("click", () => closeConfirmModal(false));
-    Dom.ConfirmCancelBtn.addEventListener("click", () => closeConfirmModal(false));
-    Dom.ConfirmOkBtn.addEventListener("click", () => closeConfirmModal(true));
-
-    window.addEventListener("keydown", (e) => {
-        if (Dom.ConfirmModal.hidden) return;
-
-        if (e.key === "Escape") {
-            e.preventDefault();
-            closeConfirmModal(false);
-        }
-    });
+    render();
 }
 
 /* -------------------------
    Render core
 -------------------------- */
-
-function renderLoading() {
-    Dom.OccurrenceList.innerHTML = `<div class="Empty">Cargando…</div>`;
-    Dom.StartDayBtn.disabled = true;
-    Dom.OpenCreateBtn.disabled = true;
-}
 
 function render() {
     stopTimerTick();
@@ -390,7 +341,6 @@ function render() {
 
     Dom.OpenCreateBtn.disabled = AppState.isSaving;
 
-    // Si hay sesión activa, el "día" de la vista debe seguir el dayKey de la sesión
     if (AppState.view === "today" && AppState.data.activeDaySession?.dayKey) {
         const sk = AppState.data.activeDaySession.dayKey;
         const ak = DateUtils.toLocalDateKey(AppState.anchorDate);
@@ -422,6 +372,7 @@ function render() {
 
     if (occurrences.length === 0) {
         Dom.OccurrenceList.innerHTML = `<div class="Empty">No hay eventos en este rango</div>`;
+        refreshLucideIcons();
         return;
     }
 
@@ -431,48 +382,17 @@ function render() {
     }
 
     Dom.OccurrenceList.innerHTML = renderOccurrences(occurrences, AppState.view, currentOccId);
+    refreshLucideIcons();
 }
-
-/* -------------------------
-   Rango por vista
--------------------------- */
-
-function computeRange() {
-    const anchor = new Date(AppState.anchorDate);
-    anchor.setHours(0, 0, 0, 0);
-
-    if (AppState.view === "today") {
-        const start = new Date(anchor);
-        const end = new Date(anchor);
-        end.setHours(23, 59, 59, 999);
-        return { rangeStart: start, rangeEnd: end, title: `Día · ${DateUtils.formatHumanDate(anchor)}` };
-    }
-
-    if (AppState.view === "week") {
-        const start = DateUtils.startOfWeek(anchor);
-        const end = DateUtils.endOfWeek(anchor);
-        return { rangeStart: start, rangeEnd: end, title: `Semana · ${DateUtils.formatHumanDate(start)} → ${DateUtils.formatHumanDate(end)}` };
-    }
-
-    const start = DateUtils.addDays(anchor, -14);
-    const end = DateUtils.addDays(anchor, 30);
-    end.setHours(23, 59, 59, 999);
-    return { rangeStart: start, rangeEnd: end, title: `Todo · ${DateUtils.formatHumanDate(start)} → ${DateUtils.formatHumanDate(end)}` };
-}
-
-function shiftAnchor(direction) {
-    if (AppState.view === "today") AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction);
-    else if (AppState.view === "week") AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 7);
-    else AppState.anchorDate = DateUtils.addDays(AppState.anchorDate, direction * 30);
-    render();
-}
-
-/* -------------------------
-   Render de lista
--------------------------- */
 
 function renderOccurrences(occurrences, view, currentOccId) {
-    if (view === "today") return occurrences.map(o => rowHtml(o, currentOccId)).join("");
+    if (view === "today") {
+        return occurrences
+            .slice()
+            .sort((a, b) => (Number(a.rangeOrder) - Number(b.rangeOrder)) || String(a.eventId).localeCompare(String(b.eventId)))
+            .map(o => rowHtml(o, currentOccId))
+            .join("");
+    }
 
     const byDay = new Map();
     for (const occ of occurrences) {
@@ -484,7 +404,11 @@ function renderOccurrences(occurrences, view, currentOccId) {
     for (const [dayKey, list] of byDay.entries()) {
         const day = DateUtils.fromLocalDateKey(dayKey);
         html += `<div class="GroupTitle">${DateUtils.formatHumanDate(day)}</div>`;
-        html += list.map(o => rowHtml(o, null)).join("");
+        html += list
+            .slice()
+            .sort((a, b) => (Number(a.rangeOrder) - Number(b.rangeOrder)) || String(a.eventId).localeCompare(String(b.eventId)))
+            .map(o => rowHtml(o, null))
+            .join("");
     }
 
     return html;
@@ -510,106 +434,38 @@ function rowHtml(occ, currentOccId) {
 
     const isCurrent = currentOccId && occ.occurrenceId === currentOccId ? "isCurrent" : "";
 
+    const handleHtml = (AppState.view === "today")
+        ? `<div class="DragHandle" data-drag-handle="true" aria-label="Reordenar">≡</div>`
+        : "";
+
     return `
-        <article class="Row ${isCurrent}" data-occ-id="${occ.occurrenceId}" data-event-id="${occ.eventId}">
+        <article class="Row ${isCurrent}" data-occ-id="${escapeHtml(occ.occurrenceId)}" data-event-id="${escapeHtml(occ.eventId)}">
             <div class="RowTop">
-                <div style="display:flex; gap:10px; align-items:flex-start;">
-                    ${AppState.view === "today" ? `<div class="DragHandle" data-drag-handle="true" aria-label="Reordenar">≡</div>` : ""}
+                <div style="display:flex; gap:10px; align-items:flex-start; min-width:0;">
+                    ${handleHtml}
                     <div class="TitleLine">
-                        <strong>R${occ.rangeOrder} · ${escapeHtml(occ.title)}</strong>
+                        <strong>R${Number(occ.rangeOrder)} · ${escapeHtml(occ.title)}</strong>
                         ${notesHtml}
                     </div>
                 </div>
 
                 <div class="Badges">
                     <span class="Badge ${isRest ? "isWarn" : "isAccent"}">${repeatLabel}</span>
-                    ${occ.durationMin ? `<span class="Badge isCyan">${occ.durationMin} min</span>` : ""}
+                    ${occ.durationMin ? `<span class="Badge isCyan">${Number(occ.durationMin)} min</span>` : ""}
                     ${doneBadge}
                 </div>
             </div>
 
             <div class="RowActions">
                 ${toggleBtn}
-                <button class="GhostBtn" type="button" data-edit="${occ.eventId}">Editar</button>
+                <button class="GhostBtn" type="button" data-edit="${escapeHtml(occ.eventId)}">Editar</button>
             </div>
         </article>
     `;
 }
 
 /* -------------------------
-   Reordenar eventos
--------------------------- */
-
-async function persistTodayOrderFromDom() {
-    if (AppState.view !== "today") return;
-    if (AppState.isSaving) return;
-
-    const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
-
-    // Solo reordenamos el “día” actual visible
-    const rows = Array.from(Dom.OccurrenceList.querySelectorAll(".Row[data-event-id]"));
-    if (rows.length === 0) return;
-
-    // Construimos el nuevo orden secuencial 1..N
-    const nowIso = new Date().toISOString();
-
-    // Map para acceder rápido a los eventos
-    const eventsById = new Map(AppState.data.events.map(ev => [String(ev.id), ev]));
-
-    // Calcula payloads de actualización
-    const updates = [];
-    for (let i = 0; i < rows.length; i++) {
-        const eventId = rows[i].dataset.eventId;
-        const ev = eventsById.get(String(eventId));
-        if (!ev) continue;
-
-        const newOrder = i + 1;
-
-        // Si ya coincide, no lo actualizamos
-        if (Number(ev.rangeOrder) === newOrder) continue;
-
-        const merged = {
-            ...ev,
-            rangeOrder: newOrder,
-            updatedAt: nowIso
-        };
-
-        updates.push({ id: ev.id, payload: merged });
-    }
-
-    if (updates.length === 0) {
-        // No hubo cambios reales
-        render();
-        return;
-    }
-
-    AppState.isSaving = true;
-    render();
-
-    try {
-        // ✅ Persistencia (secuencial, MockAPI no soporta batch real)
-        for (const u of updates) {
-            const updated = await Api.updateEvent(u.id, u.payload);
-
-            const idx = AppState.data.events.findIndex(x => String(x.id) === String(u.id));
-            if (idx >= 0) AppState.data.events[idx] = updated;
-        }
-
-        // ✅ Si el día está iniciado, recalcula el plan respetando done (por occurrenceId estable)
-        await recalculateActiveDayIfNeeded();
-
-        showToastLikeNotice("Orden actualizado ✅");
-    } catch (err) {
-        console.error(err);
-        showToastLikeNotice("No se pudo guardar el nuevo orden en MockAPI.");
-    } finally {
-        AppState.isSaving = false;
-        render();
-    }
-}
-
-/* -------------------------
-   Día iniciado: render + acciones
+   Active day session UI
 -------------------------- */
 
 function renderActiveDaySession() {
@@ -650,77 +506,12 @@ function renderActiveDaySession() {
         </div>
     `;
 
+    refreshLucideIcons();
     startTimerTick(session);
 }
 
-function nextRange() {
-    if (!lockAction()) return;
-
-    const session = AppState.data.activeDaySession;
-    if (!session) return;
-
-    moveToNext(session);
-    queueActiveSessionSave();
-    render();
-}
-
-function markCurrentOnly() {
-    if (!lockAction()) return;
-
-    const session = AppState.data.activeDaySession;
-    if (!session) return;
-
-    const current = getCurrentOccurrence(session);
-    if (!current) return;
-
-    // ✅ Solo marca el actual. (No marca el siguiente aunque se dispare doble evento)
-    session.doneByOccId[current.occurrenceId] = true;
-
-    // Se mueve el puntero al siguiente pendiente (sin marcarlo)
-    moveToNext(session);
-
-    queueActiveSessionSave();
-    render();
-}
-
-async function finalizeDayWithModal() {
-    const session = AppState.data.activeDaySession;
-    if (!session?.remoteId || AppState.isSaving) return;
-
-    const total = session.plan?.length ?? 0;
-    const doneCount = Object.values(session.doneByOccId ?? {}).filter(Boolean).length;
-
-    const ok = await openConfirmModal({
-        title: "Finalizar día",
-        body:
-            `Día activo: ${session.dayKey}\n` +
-            `Progreso: ${doneCount}/${total}\n\n` +
-            `Esto cerrará la sesión y borrará el progreso del día en MockAPI.`,
-        okText: "Sí, finalizar",
-        cancelText: "Cancelar"
-    });
-
-    if (!ok) return;
-
-    AppState.isSaving = true;
-    render();
-
-    try {
-        clearTimeout(pendingSessionSaveTimer);
-        await Api.deleteRecurrence(session.remoteId);
-        AppState.data.activeDaySession = null;
-        showToastLikeNotice("Día finalizado ✅");
-    } catch (err) {
-        console.error(err);
-        showToastLikeNotice("No se pudo finalizar el día en MockAPI.");
-    } finally {
-        AppState.isSaving = false;
-        render();
-    }
-}
-
 /* -------------------------
-   Temporizador
+   Timer logic
 -------------------------- */
 
 function startTimerTick(session) {
@@ -736,10 +527,11 @@ function startTimerTick(session) {
         const doneCount = Object.values(session.doneByOccId ?? {}).filter(Boolean).length;
 
         if (total > 0 && doneCount === total) {
-            mainEl.textContent = "Día completado ✅";
+            mainEl.innerHTML = `Día completado <span class="UiIcon"><i data-lucide="check-circle"></i></span>`;
             remainEl.textContent = "";
             subEl.textContent = "Todo listo. Puedes finalizar el día.";
             timerLine?.classList.remove("isRunning");
+            refreshLucideIcons();
             return;
         }
 
@@ -756,11 +548,11 @@ function startTimerTick(session) {
         const schedule = buildSchedule(session);
         const item = schedule.find(x => x.occurrenceId === current.occurrenceId);
 
-        mainEl.textContent = `R${current.rangeOrder} · ${current.title}`;
+        mainEl.textContent = `R${Number(current.rangeOrder)} · ${current.title}`;
 
         if (!item || item.durationSec <= 0) {
             remainEl.textContent = "Sin duración";
-            subEl.textContent = "Define minutos para ver el temporizador en tiempo real";
+            subEl.textContent = "Define un tiempo para ver el temporizador";
             timerLine?.classList.remove("isRunning");
             return;
         }
@@ -811,34 +603,80 @@ function buildSchedule(session) {
         schedule.push(item);
         cursorMs = item.endMs;
     }
+
     return schedule;
 }
 
 /* -------------------------
-   Toggle done (por tarjeta)
+   Day started actions
 -------------------------- */
 
-function toggleDone(occurrenceId) {
+function nextRange() {
     if (!lockAction()) return;
 
     const session = AppState.data.activeDaySession;
-    const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+    if (!session) return;
 
-    if (!session || session.dayKey !== dayKey) return;
-    if (!occurrenceId || !Object.prototype.hasOwnProperty.call(session.doneByOccId, occurrenceId)) return;
-
-    session.doneByOccId[occurrenceId] = !session.doneByOccId[occurrenceId];
-
-    // Si acabas de marcar el current, mueve el puntero
-    const current = getCurrentOccurrence(session);
-    if (current && session.doneByOccId[current.occurrenceId]) moveToNext(session);
-
+    moveToNext(session);
     queueActiveSessionSave();
     render();
 }
 
+function markCurrentOnly() {
+    if (!lockAction()) return;
+
+    const session = AppState.data.activeDaySession;
+    if (!session) return;
+
+    const current = getCurrentOccurrence(session);
+    if (!current) return;
+
+    session.doneByOccId[current.occurrenceId] = true;
+
+    moveToNext(session);
+    queueActiveSessionSave();
+    render();
+}
+
+async function finalizeDayWithModal() {
+    const session = AppState.data.activeDaySession;
+    if (!session?.remoteId || AppState.isSaving) return;
+
+    const total = session.plan?.length ?? 0;
+    const doneCount = Object.values(session.doneByOccId ?? {}).filter(Boolean).length;
+
+    const ok = await openConfirmModal({
+        title: "Finalizar día",
+        body:
+            `Día activo: ${session.dayKey}\n` +
+            `Progreso: ${doneCount}/${total}\n\n` +
+            `Esto cerrará la sesión y borrará el progreso del día en MockAPI.`,
+        okText: "Sí, finalizar",
+        cancelText: "Cancelar"
+    });
+
+    if (!ok) return;
+
+    AppState.isSaving = true;
+    render();
+
+    try {
+        clearTimeout(pendingSessionSaveTimer);
+        await Api.deleteRecurrence(session.remoteId);
+
+        AppState.data.activeDaySession = null;
+        showToastLikeNotice("Día finalizado", "success");
+    } catch (err) {
+        console.error(err);
+        showToastLikeNotice("No se pudo finalizar el día en MockAPI.", "warn");
+    } finally {
+        AppState.isSaving = false;
+        render();
+    }
+}
+
 /* -------------------------
-   Selección de currentIndex
+   Current index management
 -------------------------- */
 
 function getCurrentOccurrence(session) {
@@ -871,7 +709,29 @@ function moveToNext(session) {
 }
 
 /* -------------------------
-   Persistencia sesión (debounce)
+   Toggle done from card button
+-------------------------- */
+
+function toggleDone(occurrenceId) {
+    if (!lockAction()) return;
+
+    const session = AppState.data.activeDaySession;
+    const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+
+    if (!session || session.dayKey !== dayKey) return;
+    if (!occurrenceId || !Object.prototype.hasOwnProperty.call(session.doneByOccId, occurrenceId)) return;
+
+    session.doneByOccId[occurrenceId] = !session.doneByOccId[occurrenceId];
+
+    const current = getCurrentOccurrence(session);
+    if (current && session.doneByOccId[current.occurrenceId]) moveToNext(session);
+
+    queueActiveSessionSave();
+    render();
+}
+
+/* -------------------------
+   Session persistence (debounced)
 -------------------------- */
 
 function queueActiveSessionSave() {
@@ -901,12 +761,12 @@ async function saveActiveSessionToApiNow() {
         await Api.updateRecurrence(session.remoteId, payload);
     } catch (err) {
         console.error(err);
-        showToastLikeNotice("No se pudo sincronizar la sesión con MockAPI.");
+        showToastLikeNotice("No se pudo sincronizar la sesión con MockAPI.", "warn");
     }
 }
 
 /* -------------------------
-   Iniciar día
+   Start day logic
 -------------------------- */
 
 function updateStartDayButtonState() {
@@ -943,7 +803,7 @@ async function startDayOnly() {
     const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
 
     if (dayKey !== todayKey) {
-        showToastLikeNotice("Solo puedes iniciar el día de hoy.");
+        showToastLikeNotice("Solo puedes iniciar el día de hoy.", "warn");
         return;
     }
 
@@ -951,7 +811,7 @@ async function startDayOnly() {
 
     const plan = buildDayPlan(dayKey);
     if (!plan || plan.length === 0) {
-        showToastLikeNotice("No puedes iniciar el día porque no hay eventos para hoy.");
+        showToastLikeNotice("No puedes iniciar el día porque no hay eventos para hoy.", "warn");
         return;
     }
 
@@ -975,16 +835,17 @@ async function startDayOnly() {
     };
 
     try {
-        // Asegura que no exista otro active
         const recs = await Api.getRecurrences();
         const actives = (Array.isArray(recs) ? recs : []).filter(r => r.status === "active");
         for (const r of actives) await safeDeleteRecurrence(r.id);
 
         const created = await Api.createRecurrence(payload);
         setActiveSessionFromRemote(created);
+
+        showToastLikeNotice("Día iniciado", "success");
     } catch (err) {
         console.error(err);
-        showToastLikeNotice("No se pudo iniciar el día en MockAPI.");
+        showToastLikeNotice("No se pudo iniciar el día en MockAPI.", "warn");
     } finally {
         AppState.isSaving = false;
         render();
@@ -992,7 +853,7 @@ async function startDayOnly() {
 }
 
 /* -------------------------
-   Plan del día + Regla descanso
+   Plan for a day + Rest rule
 -------------------------- */
 
 function buildDayPlan(dayKey) {
@@ -1001,14 +862,11 @@ function buildDayPlan(dayKey) {
     dayEnd.setHours(23, 59, 59, 999);
 
     const occ = Recurrence.buildOccurrences(AppState.data.events, dayStart, dayEnd);
-    const filtered = applyRestOverride(occ, dayKey);
+    const dayList = applyRestOverride(occ, dayKey);
 
-    filtered.sort((a, b) => {
-        if (a.rangeOrder !== b.rangeOrder) return a.rangeOrder - b.rangeOrder;
-        return String(a.eventId).localeCompare(String(b.eventId));
-    });
+    dayList.sort((a, b) => (Number(a.rangeOrder) - Number(b.rangeOrder)) || String(a.eventId).localeCompare(String(b.eventId)));
 
-    return filtered;
+    return dayList;
 }
 
 function applyRestOverride(occurrences, dayKey) {
@@ -1017,15 +875,15 @@ function applyRestOverride(occurrences, dayKey) {
     const nonDailyRanges = new Set();
     for (const o of dayList) {
         const type = o.repeat?.type ?? "none";
-        if (type !== "daily") nonDailyRanges.add(o.rangeOrder);
+        if (type !== "daily") nonDailyRanges.add(Number(o.rangeOrder));
     }
 
     const filtered = dayList.filter(o => {
         if (!isRestTitle(o.title)) return true;
-        return !nonDailyRanges.has(o.rangeOrder);
+        return !nonDailyRanges.has(Number(o.rangeOrder));
     });
 
-    filtered.sort((a, b) => a.rangeOrder - b.rangeOrder);
+    filtered.sort((a, b) => (Number(a.rangeOrder) - Number(b.rangeOrder)) || String(a.eventId).localeCompare(String(b.eventId)));
     return filtered;
 }
 
@@ -1034,7 +892,45 @@ function isRestTitle(title) {
 }
 
 /* -------------------------
-   Cross-midnight (conservar hoy y ayer; borrar antier)
+   Recalculate plan when editing/deleting while day is active
+-------------------------- */
+
+async function recalcActivePlanIfNeeded() {
+    const session = AppState.data.activeDaySession;
+    if (!session) return;
+
+    const dayKey = session.dayKey;
+    const newPlan = buildDayPlan(dayKey);
+
+    const oldDone = session.doneByOccId ?? {};
+    const oldCurrentOccId = getCurrentOccurrence(session)?.occurrenceId ?? null;
+
+    const newDone = {};
+    for (const o of newPlan) {
+        newDone[o.occurrenceId] = Boolean(oldDone[o.occurrenceId] ?? false);
+    }
+
+    session.plan = newPlan;
+    session.doneByOccId = newDone;
+
+    if (oldCurrentOccId) {
+        const idx = newPlan.findIndex(x => x.occurrenceId === oldCurrentOccId && !newDone[x.occurrenceId]);
+        if (idx >= 0) {
+            session.currentIndex = idx;
+        } else {
+            const firstUndone = newPlan.findIndex(x => !newDone[x.occurrenceId]);
+            session.currentIndex = firstUndone >= 0 ? firstUndone : 0;
+        }
+    } else {
+        const firstUndone = newPlan.findIndex(x => !newDone[x.occurrenceId]);
+        session.currentIndex = firstUndone >= 0 ? firstUndone : 0;
+    }
+
+    queueActiveSessionSave();
+}
+
+/* -------------------------
+   Cross-midnight retention
 -------------------------- */
 
 function yesterdayKey() {
@@ -1051,7 +947,7 @@ function keepUntilIso(dayKey) {
 }
 
 /* -------------------------
-   Hydrate API
+   API hydration + cleanup
 -------------------------- */
 
 async function hydrateFromApi() {
@@ -1064,7 +960,6 @@ async function hydrateFromApi() {
     const yKey = yesterdayKey();
     const now = Date.now();
 
-    // Limpia antier y expirados
     for (const r of list) {
         const keepUntil = r.keepUntil ? new Date(r.keepUntil).getTime() : null;
         const expired = keepUntil && now > keepUntil;
@@ -1075,7 +970,6 @@ async function hydrateFromApi() {
         }
     }
 
-    // Re-lee y toma active (hoy o ayer)
     const recs2 = await Api.getRecurrences();
     const list2 = Array.isArray(recs2) ? recs2 : [];
 
@@ -1093,6 +987,14 @@ async function hydrateFromApi() {
     }
 }
 
+async function safeDeleteRecurrence(id) {
+    try {
+        await Api.deleteRecurrence(id);
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 function setActiveSessionFromRemote(remote) {
     const rawPlan = Array.isArray(remote.plan) ? remote.plan : [];
     const oldDone = remote.doneByOccId ?? {};
@@ -1103,22 +1005,21 @@ function setActiveSessionFromRemote(remote) {
         const stableId = `${eventId}__${dayKey}`;
 
         return {
-            ...o,
+            occurrenceId: stableId,
             eventId,
             dayKey,
-            occurrenceId: stableId,
-            rangeOrder: Number(o.rangeOrder ?? 999)
+            title: String(o.title ?? ""),
+            notes: String(o.notes ?? ""),
+            rangeOrder: Number(o.rangeOrder ?? 999),
+            durationMin: o.durationMin ?? null,
+            repeat: o.repeat ?? { type: "none" }
         };
     });
 
-    normalizedPlan.sort((a, b) => {
-        if (a.rangeOrder !== b.rangeOrder) return a.rangeOrder - b.rangeOrder;
-        return String(a.eventId).localeCompare(String(b.eventId));
-    });
+    normalizedPlan.sort((a, b) => (Number(a.rangeOrder) - Number(b.rangeOrder)) || String(a.eventId).localeCompare(String(b.eventId)));
 
     const newDone = {};
     for (const o of normalizedPlan) {
-        // ✅ soporte de migración: si antes venía con "__R", intenta leer ese key viejo
         const legacyKey = `${o.eventId}__${o.dayKey}__R${o.rangeOrder}`;
         newDone[o.occurrenceId] = Boolean(oldDone[o.occurrenceId] ?? oldDone[legacyKey] ?? false);
     }
@@ -1135,45 +1036,71 @@ function setActiveSessionFromRemote(remote) {
 }
 
 /* -------------------------
-   CRUD Eventos
+   Event Sheet: open/create/edit
 -------------------------- */
 
+function getSuggestedRangeOrder() {
+    const max = AppState.data.events.reduce((acc, e) => Math.max(acc, Number(e.rangeOrder ?? 0)), 0);
+    return Math.max(1, max + 1);
+}
+
 function openEventSheetForCreate() {
-    Dom.EventSheetTitle.textContent = "Agregar Evento";
+    Dom.EventSheetTitle.textContent = "Agregar evento";
     Dom.DeleteBtn.hidden = true;
 
     Dom.EventId.value = "";
     Dom.EventKind.value = "event";
+    Dom.EventKindBtn.textContent = "Evento";
+
+    Dom.RangeOrderInput.value = String(getSuggestedRangeOrder());
 
     Dom.TitleInput.value = "";
-    Dom.RangeOrderInput.value = "10";
+    UiState.durationUnit = "min";
     Dom.DurationInput.value = "45";
     Dom.NotesInput.value = "";
 
-    Dom.RepeatType.value = "none";
     Dom.StartOnInput.value = DateUtils.toLocalDateKey(new Date());
 
-    renderRepeatConfig(Dom.RepeatConfig, Dom.RepeatType.value, null);
+    Dom.RepeatType.value = "none";
+    Dom.RepeatTypeBtn.textContent = repeatToLabel("none");
+    renderRepeatConfig("none", null);
+
+    applyDurationUnitConstraints();
     applyKindUI();
     openEventSheet();
 }
 
 function openEventSheetForEdit(event) {
-    Dom.EventSheetTitle.textContent = "Editar Evento";
+    Dom.EventSheetTitle.textContent = "Editar evento";
     Dom.DeleteBtn.hidden = false;
 
-    Dom.EventId.value = event.id;
-    Dom.EventKind.value = event.kind ?? (isRestTitle(event.title) ? "rest" : "event");
+    Dom.EventId.value = String(event.id);
 
-    Dom.TitleInput.value = event.title ?? "";
-    Dom.RangeOrderInput.value = String(event.rangeOrder ?? 10);
-    Dom.DurationInput.value = event.durationMin ?? "";
-    Dom.NotesInput.value = event.notes ?? "";
+    const kind = event.kind ?? (isRestTitle(event.title) ? "rest" : "event");
+    Dom.EventKind.value = kind;
+    Dom.EventKindBtn.textContent = kind === "rest" ? "Descanso" : "Evento";
 
-    Dom.RepeatType.value = event.repeat?.type ?? "none";
-    Dom.StartOnInput.value = event.startOn ?? DateUtils.toLocalDateKey(new Date());
+    Dom.RangeOrderInput.value = String(event.rangeOrder ?? 1);
 
-    renderRepeatConfig(Dom.RepeatConfig, Dom.RepeatType.value, event);
+    Dom.TitleInput.value = String(event.title ?? "");
+    Dom.NotesInput.value = String(event.notes ?? "");
+    Dom.StartOnInput.value = String(event.startOn ?? DateUtils.toLocalDateKey(new Date()));
+
+    const rt = event.repeat?.type ?? "none";
+    Dom.RepeatType.value = rt;
+    Dom.RepeatTypeBtn.textContent = repeatToLabel(rt);
+    renderRepeatConfig(rt, event);
+
+    const dMin = event.durationMin ? Number(event.durationMin) : null;
+    if (dMin && dMin >= 60 && dMin % 60 === 0) {
+        UiState.durationUnit = "h";
+        Dom.DurationInput.value = String(dMin / 60);
+    } else {
+        UiState.durationUnit = "min";
+        Dom.DurationInput.value = dMin ? String(dMin) : "";
+    }
+
+    applyDurationUnitConstraints();
     applyKindUI();
     openEventSheet();
 }
@@ -1205,83 +1132,319 @@ function closeEventSheet() {
     Dom.EventSheet.hidden = true;
 }
 
+/* -------------------------
+   Pickers (custom dropdowns)
+-------------------------- */
+
+async function onPickKind() {
+    const picked = await openPicker({
+        title: "Tipo",
+        options: [
+            { value: "event", label: "Evento" },
+            { value: "rest", label: "Descanso" }
+        ]
+    });
+
+    if (!picked) return;
+
+    Dom.EventKind.value = picked;
+    Dom.EventKindBtn.textContent = picked === "rest" ? "Descanso" : "Evento";
+    applyKindUI();
+}
+
+async function onPickRepeat() {
+    const picked = await openPicker({
+        title: "Repetición",
+        options: [
+            { value: "none", label: "Único" },
+            { value: "daily", label: "Diario" },
+            { value: "weekly", label: "Semanal" },
+            { value: "monthly", label: "Mensual" },
+            { value: "interval", label: "Cada N días" },
+            { value: "dates", label: "Fechas específicas" }
+        ]
+    });
+
+    if (!picked) return;
+
+    Dom.RepeatType.value = picked;
+    Dom.RepeatTypeBtn.textContent = repeatToLabel(picked);
+    renderRepeatConfig(picked, null);
+}
+
+/* -------------------------
+   Duration unit toggle
+-------------------------- */
+
+function onToggleDurationUnit(e) {
+    e.preventDefault();
+
+    const currentValRaw = String(Dom.DurationInput.value ?? "").trim();
+    const currentNum = currentValRaw ? Number(currentValRaw) : null;
+
+    if (UiState.durationUnit === "min") {
+        UiState.durationUnit = "h";
+        Dom.DurationUnitBtn.textContent = "h";
+
+        if (currentNum !== null && Number.isFinite(currentNum)) {
+            const hours = Math.max(1, Math.ceil(currentNum / 60));
+            Dom.DurationInput.value = String(hours);
+        }
+    } else {
+        UiState.durationUnit = "min";
+        Dom.DurationUnitBtn.textContent = "min";
+
+        if (currentNum !== null && Number.isFinite(currentNum)) {
+            const minutes = Math.max(1, Math.round(currentNum * 60));
+            Dom.DurationInput.value = String(minutes);
+        }
+    }
+
+    applyDurationUnitConstraints();
+}
+
+function applyDurationUnitConstraints() {
+    if (UiState.durationUnit === "min") {
+        Dom.DurationInput.min = "1";
+        Dom.DurationInput.max = "1440";
+        Dom.DurationInput.step = "1";
+        Dom.DurationHelp.textContent = "Mínimo 1 minuto, máximo 1440 minutos";
+        Dom.DurationUnitBtn.textContent = "min";
+    } else {
+        Dom.DurationInput.min = "1";
+        Dom.DurationInput.max = "24";
+        Dom.DurationInput.step = "1";
+        Dom.DurationHelp.textContent = "Mínimo 1 hora, máximo 24 horas (se convierte a minutos)";
+        Dom.DurationUnitBtn.textContent = "h";
+    }
+}
+
+/* -------------------------
+   Repeat config rendering
+-------------------------- */
+
+function renderRepeatConfig(type, event) {
+    if (type === "weekly") {
+        const picked = new Set((event?.repeat?.daysOfWeek ?? []).map(Number));
+        Dom.RepeatConfig.innerHTML = `
+            <div class="Field">
+                <span>Días de la semana</span>
+                <div class="CheckRow">
+                    ${renderDowPill(1, "Lun", picked.has(1))}
+                    ${renderDowPill(2, "Mar", picked.has(2))}
+                    ${renderDowPill(3, "Mié", picked.has(3))}
+                    ${renderDowPill(4, "Jue", picked.has(4))}
+                    ${renderDowPill(5, "Vie", picked.has(5))}
+                    ${renderDowPill(6, "Sáb", picked.has(6))}
+                    ${renderDowPill(0, "Dom", picked.has(0))}
+                </div>
+                <small>Selecciona uno o varios días</small>
+            </div>
+        `;
+        return;
+    }
+
+    if (type === "monthly") {
+        const dayOfMonth = Number(event?.repeat?.dayOfMonth ?? 1);
+        Dom.RepeatConfig.innerHTML = `
+            <label class="Field">
+                <span>Día del mes</span>
+                <input id="RepeatMonthDay" type="number" min="1" max="31" step="1" value="${escapeHtml(dayOfMonth)}" />
+                <small>Ej. 1 para el primer día del mes</small>
+            </label>
+        `;
+        return;
+    }
+
+    if (type === "interval") {
+        const everyDays = Number(event?.repeat?.everyDays ?? 2);
+        Dom.RepeatConfig.innerHTML = `
+            <label class="Field">
+                <span>Cada N días</span>
+                <input id="RepeatEveryDays" type="number" min="1" max="365" step="1" value="${escapeHtml(everyDays)}" />
+                <small>Ej. 2 para un día sí y un día no</small>
+            </label>
+        `;
+        return;
+    }
+
+    if (type === "dates") {
+        const list = (event?.repeat?.dateList ?? []).join(", ");
+        Dom.RepeatConfig.innerHTML = `
+            <label class="Field">
+                <span>Fechas</span>
+                <textarea id="RepeatDateList" rows="2" maxlength="600" placeholder="YYYY-MM-DD, YYYY-MM-DD">${escapeHtml(list)}</textarea>
+                <small>Separadas por coma</small>
+            </label>
+        `;
+        return;
+    }
+
+    Dom.RepeatConfig.innerHTML = `<div class="Empty">Sin configuración extra</div>`;
+}
+
+function renderDowPill(value, label, checked) {
+    const id = `Dow_${value}`;
+    return `
+        <label class="CheckPill" for="${id}">
+            <input id="${id}" type="checkbox" data-dow="${value}" ${checked ? "checked" : ""} style="display:none" />
+            ${label}
+        </label>
+    `;
+}
+
+/* -------------------------
+   Submit / Delete event
+-------------------------- */
+
 async function onSubmitEvent(e) {
     e.preventDefault();
     if (AppState.isSaving) return;
-
-    const isEdit = Boolean(Dom.EventId.value);
-    const id = Dom.EventId.value || null;
-
-    const kind = Dom.EventKind.value;
-    const title = (kind === "rest") ? "Descanso" : Dom.TitleInput.value.trim();
-    const rangeOrder = Number(Dom.RangeOrderInput.value);
-    const durationMin = Dom.DurationInput.value ? Number(Dom.DurationInput.value) : null;
-    const notes = (kind === "rest") ? "" : Dom.NotesInput.value.trim();
-
-    const startOn = Dom.StartOnInput.value || DateUtils.toLocalDateKey(new Date());
-    const repeatType = Dom.RepeatType.value;
-
-    const weekdayFilter = getWeekdayFilter(Dom.RepeatConfig);
-    const repeat = buildRepeat(repeatType, Dom.RepeatConfig);
-
-    const nowIso = new Date().toISOString();
-
-    const payload = {
-        kind,
-        title,
-        rangeOrder,
-        durationMin,
-        notes,
-        startOn,
-        weekdayFilter,
-        repeat,
-        archived: false,
-        updatedAt: nowIso,
-        ...(isEdit ? {} : { createdAt: nowIso })
-    };
 
     AppState.isSaving = true;
     render();
 
     try {
-        if (!isEdit) {
-            const created = await Api.createEvent(payload);
-            AppState.data.events.push(created);
+        const id = String(Dom.EventId.value || "").trim();
+        const kind = Dom.EventKind.value;
+
+        const rangeOrder = Math.max(1, Number(Dom.RangeOrderInput.value || 1));
+        const startOn = String(Dom.StartOnInput.value || DateUtils.toLocalDateKey(new Date())).trim();
+
+        let title = String(Dom.TitleInput.value || "").trim();
+        let notes = String(Dom.NotesInput.value || "").trim();
+
+        if (kind === "rest") {
+            title = "Descanso";
+            notes = "";
         } else {
-            const prev = AppState.data.events.find(x => x.id === id) ?? {};
-            const merged = { ...prev, ...payload };
-            const updated = await Api.updateEvent(id, merged);
-            const idx = AppState.data.events.findIndex(x => x.id === id);
-            if (idx >= 0) AppState.data.events[idx] = updated;
+            if (!title) throw new Error("El título es obligatorio.");
         }
 
-        await recalculateActiveDayIfNeeded();
+        const durationRaw = String(Dom.DurationInput.value || "").trim();
+        let durationMin = null;
+        if (durationRaw) {
+            const n = Number(durationRaw);
+            if (!Number.isFinite(n) || n <= 0) throw new Error("Tiempo inválido.");
+
+            if (UiState.durationUnit === "h") {
+                durationMin = Math.max(1, Math.min(1440, Math.round(n * 60)));
+            } else {
+                durationMin = Math.max(1, Math.min(1440, Math.round(n)));
+            }
+        }
+
+        const repeatType = Dom.RepeatType.value ?? "none";
+        const repeat = buildRepeatPayload(repeatType);
+
+        const nowIso = new Date().toISOString();
+
+        const payload = {
+            kind,
+            title,
+            rangeOrder,
+            durationMin,
+            notes,
+            startOn,
+            repeat,
+            archived: false,
+            updatedAt: nowIso
+        };
+
+        if (!id) {
+            payload.createdAt = nowIso;
+            const created = await Api.createEvent(payload);
+            AppState.data.events.push(created);
+            showToastLikeNotice("Evento creado", "success");
+        } else {
+            const updated = await Api.updateEvent(id, payload);
+            const idx = AppState.data.events.findIndex(x => String(x.id) === String(id));
+            if (idx >= 0) AppState.data.events[idx] = updated;
+            showToastLikeNotice("Evento actualizado", "success");
+        }
+
         closeEventSheet();
+
+        await recalcActivePlanIfNeeded();
     } catch (err) {
         console.error(err);
-        showToastLikeNotice("No se pudo guardar el evento en MockAPI.");
+        showToastLikeNotice(err?.message ? String(err.message) : "No se pudo guardar.", "warn");
     } finally {
         AppState.isSaving = false;
         render();
     }
 }
 
+function buildRepeatPayload(type) {
+    if (type === "daily") return { type: "daily" };
+
+    if (type === "weekly") {
+        const checked = [...Dom.RepeatConfig.querySelectorAll("input[type='checkbox'][data-dow]:checked")]
+            .map(x => Number(x.getAttribute("data-dow")))
+            .filter(n => Number.isFinite(n));
+
+        if (checked.length === 0) {
+            return { type: "weekly", daysOfWeek: [1, 2, 3, 4, 5] };
+        }
+
+        return { type: "weekly", daysOfWeek: checked };
+    }
+
+    if (type === "monthly") {
+        const el = Dom.RepeatConfig.querySelector("#RepeatMonthDay");
+        const dayOfMonth = el ? Math.max(1, Math.min(31, Number(el.value || 1))) : 1;
+        return { type: "monthly", dayOfMonth };
+    }
+
+    if (type === "interval") {
+        const el = Dom.RepeatConfig.querySelector("#RepeatEveryDays");
+        const everyDays = el ? Math.max(1, Math.min(365, Number(el.value || 2))) : 2;
+        return { type: "interval", everyDays };
+    }
+
+    if (type === "dates") {
+        const el = Dom.RepeatConfig.querySelector("#RepeatDateList");
+        const raw = el ? String(el.value || "") : "";
+        const list = raw
+            .split(",")
+            .map(x => x.trim())
+            .filter(Boolean)
+            .filter(isValidDateKey);
+
+        return { type: "dates", dateList: list };
+    }
+
+    if (type === "none") return { type: "none" };
+
+    return { type: "none" };
+}
+
 async function onDeleteEvent() {
-    const id = Dom.EventId.value;
+    const id = String(Dom.EventId.value || "").trim();
     if (!id || AppState.isSaving) return;
+
+    const ok = await openConfirmModal({
+        title: "Eliminar rango",
+        body: "¿Seguro que quieres eliminar este rango? Esta acción no se puede deshacer.",
+        okText: "Eliminar",
+        cancelText: "Cancelar"
+    });
+
+    if (!ok) return;
 
     AppState.isSaving = true;
     render();
 
     try {
         await Api.deleteEvent(id);
-        AppState.data.events = AppState.data.events.filter(ev => ev.id !== id);
-
-        await recalculateActiveDayIfNeeded();
+        AppState.data.events = AppState.data.events.filter(x => String(x.id) !== String(id));
         closeEventSheet();
+
+        await recalcActivePlanIfNeeded();
+        showToastLikeNotice("Rango eliminado", "success");
     } catch (err) {
         console.error(err);
-        showToastLikeNotice("No se pudo eliminar el evento en MockAPI.");
+        showToastLikeNotice("No se pudo eliminar en MockAPI.", "warn");
     } finally {
         AppState.isSaving = false;
         render();
@@ -1289,243 +1452,296 @@ async function onDeleteEvent() {
 }
 
 /* -------------------------
-   Recalcular sesión activa si cambian eventos
+   Drag & Drop (pointer-based)
 -------------------------- */
 
-async function recalculateActiveDayIfNeeded() {
-    const session = AppState.data.activeDaySession;
-    if (!session?.remoteId) return;
-
-    const dayKey = session.dayKey;
-    const plan = buildDayPlan(dayKey);
-
-    if (!plan || plan.length === 0) {
-        await safeDeleteRecurrence(session.remoteId);
-        AppState.data.activeDaySession = null;
-        showToastLikeNotice("El día activo se cerró porque ya no hay rangos.");
-        return;
-    }
-
-    const oldDone = session.doneByOccId ?? {};
-    const newDone = {};
-    for (const o of plan) newDone[o.occurrenceId] = Boolean(oldDone[o.occurrenceId]);
-
-    const oldCurrentOccId = session.plan?.[session.currentIndex]?.occurrenceId ?? null;
-    let newIndex = oldCurrentOccId ? plan.findIndex(o => o.occurrenceId === oldCurrentOccId) : 0;
-    if (newIndex < 0) newIndex = 0;
-
-    session.plan = plan;
-    session.doneByOccId = newDone;
-    session.currentIndex = newIndex;
-
-    getCurrentOccurrence(session);
-
-    await saveActiveSessionToApiNow();
+function enableSortablePointerDnD() {
+    Dom.OccurrenceList.addEventListener("pointerdown", onPointerDownDrag, { passive: false });
+    Dom.OccurrenceList.addEventListener("pointermove", onPointerMoveDrag, { passive: false });
+    Dom.OccurrenceList.addEventListener("pointerup", onPointerUpDrag, { passive: false });
+    Dom.OccurrenceList.addEventListener("pointercancel", onPointerUpDrag, { passive: false });
 }
 
-/* -------------------------
-   Repeat config
--------------------------- */
+function onPointerDownDrag(e) {
+    const handle = e.target.closest("[data-drag-handle='true']");
+    if (!handle) return;
 
-function renderRepeatConfig(container, type, eventOrNull) {
-    const selectedWeekdays = new Set(eventOrNull?.weekdayFilter ?? []);
+    if (AppState.view !== "today") return;
 
-    const weekdaysBlock = `
-        <div class="Field">
-            <span>Días permitidos (uno o varios)</span>
-            <div class="CheckRow">
-                ${weekdayPill(1, "Lun", selectedWeekdays, "AllowedWeekday")}
-                ${weekdayPill(2, "Mar", selectedWeekdays, "AllowedWeekday")}
-                ${weekdayPill(3, "Mié", selectedWeekdays, "AllowedWeekday")}
-                ${weekdayPill(4, "Jue", selectedWeekdays, "AllowedWeekday")}
-                ${weekdayPill(5, "Vie", selectedWeekdays, "AllowedWeekday")}
-                ${weekdayPill(6, "Sáb", selectedWeekdays, "AllowedWeekday")}
-                ${weekdayPill(0, "Dom", selectedWeekdays, "AllowedWeekday")}
-            </div>
-            <small>Si eliges días, el evento solo ocurre en esos días</small>
-        </div>
-    `;
+    const row = handle.closest(".Row");
+    if (!row) return;
 
-    if (type === "weekly") {
-        const selected = new Set(eventOrNull?.repeat?.daysOfWeek ?? []);
-        container.innerHTML = `
-            ${weekdaysBlock}
-            <div class="Field">
-                <span>Días de repetición semanal</span>
-                <div class="CheckRow">
-                    ${weekdayPill(1, "Lun", selected, "WeeklyDay")}
-                    ${weekdayPill(2, "Mar", selected, "WeeklyDay")}
-                    ${weekdayPill(3, "Mié", selected, "WeeklyDay")}
-                    ${weekdayPill(4, "Jue", selected, "WeeklyDay")}
-                    ${weekdayPill(5, "Vie", selected, "WeeklyDay")}
-                    ${weekdayPill(6, "Sáb", selected, "WeeklyDay")}
-                    ${weekdayPill(0, "Dom", selected, "WeeklyDay")}
-                </div>
-            </div>
-        `;
-        return;
-    }
+    e.preventDefault();
 
-    if (type === "monthly") {
-        const dayOfMonth = eventOrNull?.repeat?.dayOfMonth ?? new Date().getDate();
-        container.innerHTML = `
-            ${weekdaysBlock}
-            <label class="Field">
-                <span>Día del mes</span>
-                <input data-role="DayOfMonthInput" type="number" min="1" max="31" value="${dayOfMonth}" />
-            </label>
-        `;
-        return;
-    }
+    UiState.drag.isActive = true;
+    UiState.drag.pointerId = e.pointerId;
+    UiState.drag.dragRow = row;
 
-    if (type === "interval") {
-        const everyDays = eventOrNull?.repeat?.everyDays ?? 2;
-        container.innerHTML = `
-            ${weekdaysBlock}
-            <label class="Field">
-                <span>Cada N días</span>
-                <input data-role="EveryDaysInput" type="number" min="1" step="1" value="${everyDays}" />
-            </label>
-        `;
-        return;
-    }
+    row.classList.add("isDragging");
+    row.setPointerCapture(e.pointerId);
 
-    if (type === "dates") {
-        const dateList = (eventOrNull?.repeat?.dateList ?? []).join(", ");
-        container.innerHTML = `
-            ${weekdaysBlock}
-            <label class="Field">
-                <span>Fechas (YYYY-MM-DD separadas por coma)</span>
-                <input data-role="DateListInput" placeholder="2025-12-24, 2025-12-31" value="${escapeHtml(dateList)}" />
-            </label>
-        `;
-        return;
-    }
+    const placeholder = document.createElement("div");
+    placeholder.className = "RowPlaceholder";
+    placeholder.style.height = `${row.getBoundingClientRect().height}px`;
 
-    container.innerHTML = `${weekdaysBlock}<div class="Empty">Sin configuración adicional</div>`;
+    UiState.drag.placeholder = placeholder;
+
+    row.parentNode.insertBefore(placeholder, row.nextSibling);
 }
 
-function weekdayPill(value, label, selectedSet, name) {
-    const checked = selectedSet.has(value) ? "checked" : "";
-    return `
-        <label class="CheckPill">
-            <input type="checkbox" name="${name}" value="${value}" ${checked} />
-            <span>${label}</span>
-        </label>
-    `;
+function onPointerMoveDrag(e) {
+    if (!UiState.drag.isActive) return;
+    if (UiState.drag.pointerId !== e.pointerId) return;
+
+    e.preventDefault();
+
+    const row = UiState.drag.dragRow;
+    const placeholder = UiState.drag.placeholder;
+    if (!row || !placeholder) return;
+
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const overRow = el ? el.closest(".Row") : null;
+    if (!overRow || overRow === row) return;
+
+    const rect = overRow.getBoundingClientRect();
+    const insertBefore = e.clientY < rect.top + rect.height / 2;
+
+    if (insertBefore) {
+        Dom.OccurrenceList.insertBefore(placeholder, overRow);
+    } else {
+        Dom.OccurrenceList.insertBefore(placeholder, overRow.nextSibling);
+    }
 }
 
-function getWeekdayFilter(container) {
-    return Array.from(container.querySelectorAll('input[name="AllowedWeekday"]'))
-        .filter(x => x.checked)
-        .map(x => Number(x.value));
-}
+async function onPointerUpDrag(e) {
+    if (!UiState.drag.isActive) return;
+    if (UiState.drag.pointerId !== e.pointerId) return;
 
-function buildRepeat(type, container) {
-    if (type === "none") return { type: "none" };
-    if (type === "daily") return { type: "daily" };
+    e.preventDefault();
 
-    if (type === "weekly") {
-        const daysOfWeek = Array.from(container.querySelectorAll('input[name="WeeklyDay"]'))
-            .filter(x => x.checked)
-            .map(x => Number(x.value));
-        return { type: "weekly", daysOfWeek };
-    }
+    const row = UiState.drag.dragRow;
+    const placeholder = UiState.drag.placeholder;
 
-    if (type === "monthly") {
-        const input = container.querySelector('[data-role="DayOfMonthInput"]');
-        const dayOfMonth = Number(input?.value ?? 1);
-        return { type: "monthly", dayOfMonth };
-    }
+    UiState.drag.isActive = false;
+    UiState.drag.pointerId = null;
+    UiState.drag.dragRow = null;
+    UiState.drag.placeholder = null;
 
-    if (type === "interval") {
-        const input = container.querySelector('[data-role="EveryDaysInput"]');
-        const everyDays = Number(input?.value ?? 1);
-        return { type: "interval", everyDays };
-    }
+    if (!row || !placeholder) return;
 
-    if (type === "dates") {
-        const input = container.querySelector('[data-role="DateListInput"]');
-        const raw = (input?.value ?? "");
-        const dateList = raw.split(",").map(s => s.trim()).filter(Boolean);
-        return { type: "dates", dateList };
-    }
+    row.classList.remove("isDragging");
 
-    return { type: "none" };
-}
-
-/* -------------------------
-   Helpers API
--------------------------- */
-
-async function safeDeleteRecurrence(id) {
     try {
-        await Api.deleteRecurrence(id);
+        row.releasePointerCapture(e.pointerId);
+    } catch (_) {
+        /* Se ignora */
+    }
+
+    Dom.OccurrenceList.insertBefore(row, placeholder);
+    placeholder.remove();
+
+    await persistReorderFromDom();
+}
+
+async function persistReorderFromDom() {
+    if (AppState.view !== "today") return;
+
+    const dayKey = DateUtils.toLocalDateKey(AppState.anchorDate);
+
+    const rows = [...Dom.OccurrenceList.querySelectorAll(".Row[data-event-id]")];
+    const orderedEventIds = rows.map(r => String(r.getAttribute("data-event-id") || "")).filter(Boolean);
+
+    if (orderedEventIds.length === 0) return;
+
+    const updates = [];
+    for (let i = 0; i < orderedEventIds.length; i++) {
+        const eventId = orderedEventIds[i];
+        const newOrder = i + 1;
+
+        const ev = AppState.data.events.find(x => String(x.id) === String(eventId));
+        if (!ev) continue;
+
+        const oldOrder = Number(ev.rangeOrder ?? 0);
+        if (oldOrder === newOrder) continue;
+
+        updates.push({ id: eventId, rangeOrder: newOrder });
+        ev.rangeOrder = newOrder;
+    }
+
+    if (updates.length === 0) {
+        await recalcActivePlanIfNeeded();
+        render();
+        return;
+    }
+
+    AppState.isSaving = true;
+    render();
+
+    try {
+        for (const u of updates) {
+            const ev = AppState.data.events.find(x => String(x.id) === String(u.id));
+            if (!ev) continue;
+
+            const payload = {
+                kind: ev.kind ?? "event",
+                title: ev.title ?? "",
+                rangeOrder: Number(ev.rangeOrder ?? u.rangeOrder),
+                durationMin: ev.durationMin ?? null,
+                notes: ev.notes ?? "",
+                startOn: ev.startOn ?? DateUtils.toLocalDateKey(new Date()),
+                repeat: ev.repeat ?? { type: "none" },
+                archived: Boolean(ev.archived ?? false),
+                updatedAt: new Date().toISOString(),
+                createdAt: ev.createdAt ?? undefined
+            };
+
+            const updated = await Api.updateEvent(u.id, payload);
+            const idx = AppState.data.events.findIndex(x => String(x.id) === String(u.id));
+            if (idx >= 0) AppState.data.events[idx] = updated;
+        }
+
+        await recalcActivePlanIfNeeded();
+
+        if (AppState.data.activeDaySession?.dayKey === dayKey) {
+            const session = AppState.data.activeDaySession;
+            const currentId = getCurrentOccurrence(session)?.occurrenceId ?? null;
+
+            session.plan.sort((a, b) => (Number(a.rangeOrder) - Number(b.rangeOrder)) || String(a.eventId).localeCompare(String(b.eventId)));
+
+            if (currentId) {
+                const idx = session.plan.findIndex(x => x.occurrenceId === currentId && !session.doneByOccId[x.occurrenceId]);
+                if (idx >= 0) session.currentIndex = idx;
+            }
+
+            queueActiveSessionSave();
+        }
+
+        showToastLikeNotice("Orden actualizado", "success");
     } catch (err) {
         console.error(err);
+        showToastLikeNotice("No se pudo guardar el orden en MockAPI.", "warn");
+    } finally {
+        AppState.isSaving = false;
+        render();
     }
 }
 
 /* -------------------------
-   Markdown seguro (subset)
+   Confirm modal
 -------------------------- */
 
-function renderMarkdown(md) {
-    const raw = String(md ?? "");
-    if (!raw.trim()) return "";
+function wireConfirmModalOnce() {
+    Dom.ConfirmCloseBtn.addEventListener("click", () => closeConfirm(false));
+    Dom.ConfirmCancelBtn.addEventListener("click", () => closeConfirm(false));
+    Dom.ConfirmOverlay.addEventListener("click", () => closeConfirm(false));
+    Dom.ConfirmOkBtn.addEventListener("click", () => closeConfirm(true));
+}
 
-    let s = escapeHtml(raw);
+function openConfirmModal({ title, body, okText, cancelText }) {
+    if (UiState.confirm.isOpen) return Promise.resolve(false);
 
-    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, text, url) => {
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    UiState.confirm.isOpen = true;
+
+    Dom.ConfirmTitle.textContent = String(title ?? "Confirmación");
+    Dom.ConfirmBody.textContent = String(body ?? "¿Seguro?");
+
+    Dom.ConfirmOkBtn.textContent = String(okText ?? "Confirmar");
+    Dom.ConfirmCancelBtn.textContent = String(cancelText ?? "Cancelar");
+
+    Dom.ConfirmOverlay.hidden = false;
+    Dom.ConfirmModal.hidden = false;
+
+    return new Promise((resolve) => {
+        UiState.confirm.resolve = resolve;
     });
+}
 
-    s = s.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
-    s = s.replace(/\*\*([^*]+)\*\*/g, (_m, bold) => `<strong>${bold}</strong>`);
-    s = s.replace(/\*([^*]+)\*/g, (_m, it) => `<em>${it}</em>`);
+function closeConfirm(value) {
+    if (!UiState.confirm.isOpen) return;
 
-    const lines = s.split("\n");
-    let out = [];
-    let inList = false;
+    UiState.confirm.isOpen = false;
 
-    for (const line of lines) {
-        const m = line.match(/^\s*-\s+(.*)$/);
-        if (m) {
-            if (!inList) {
-                out.push("<ul>");
-                inList = true;
-            }
-            out.push(`<li>${m[1]}</li>`);
-        } else {
-            if (inList) {
-                out.push("</ul>");
-                inList = false;
-            }
-            out.push(line);
-        }
-    }
+    Dom.ConfirmOverlay.hidden = true;
+    Dom.ConfirmModal.hidden = true;
 
-    if (inList) out.push("</ul>");
-    s = out.join("\n");
-    s = s.replace(/\n/g, "<br>");
-    return s;
+    const resolve = UiState.confirm.resolve;
+    UiState.confirm.resolve = null;
+
+    if (resolve) resolve(Boolean(value));
 }
 
 /* -------------------------
-   Avisos
+   Picker modal
 -------------------------- */
 
-function showToastLikeNotice(message) {
+function wirePickerModalOnce() {
+    Dom.PickerCloseBtn.addEventListener("click", () => closePicker(null));
+    Dom.PickerCancelBtn.addEventListener("click", () => closePicker(null));
+    Dom.PickerOverlay.addEventListener("click", () => closePicker(null));
+
+    Dom.PickerBody.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-pick]");
+        if (!btn) return;
+        closePicker(String(btn.getAttribute("data-pick")));
+    });
+}
+
+function openPicker({ title, options }) {
+    if (UiState.picker.isOpen) return Promise.resolve(null);
+
+    UiState.picker.isOpen = true;
+
+    Dom.PickerTitle.textContent = String(title ?? "Seleccionar");
+
+    Dom.PickerBody.innerHTML = (options ?? []).map(opt => {
+        return `
+            <button class="GhostBtn" type="button" data-pick="${escapeHtml(opt.value)}" style="width:100%; text-align:left; margin-bottom:10px;">
+                ${escapeHtml(opt.label)}
+            </button>
+        `;
+    }).join("");
+
+    Dom.PickerOverlay.hidden = false;
+    Dom.PickerModal.hidden = false;
+
+    return new Promise((resolve) => {
+        UiState.picker.resolve = resolve;
+    });
+}
+
+function closePicker(value) {
+    if (!UiState.picker.isOpen) return;
+
+    UiState.picker.isOpen = false;
+
+    Dom.PickerOverlay.hidden = true;
+    Dom.PickerModal.hidden = true;
+
+    const resolve = UiState.picker.resolve;
+    UiState.picker.resolve = null;
+
+    if (resolve) resolve(value);
+}
+
+/* -------------------------
+   Toast-like notice (⚠️/✅ -> Lucide)
+-------------------------- */
+
+function showToastLikeNotice(message, variant = "warn") {
+    const iconName = variant === "success" ? "check-circle" : "alert-triangle";
+
     Dom.ActiveSession.classList.add("isVisible");
     Dom.ActiveSession.innerHTML = `
         <div class="TimerLine">
             <div class="MainLine">
                 <span>AgendX</span>
-                <span>⚠️</span>
+                <span class="UiIcon"><i data-lucide="${iconName}"></i></span>
             </div>
             <div class="SubLine">${escapeHtml(message)}</div>
         </div>
     `;
+
+    refreshLucideIcons();
 
     window.clearTimeout(showToastLikeNotice._t);
     showToastLikeNotice._t = window.setTimeout(() => {
@@ -1535,6 +1751,61 @@ function showToastLikeNotice(message) {
         }
     }, 3200);
 }
+
+/* -------------------------
+   Markdown renderer (safe + simple)
+-------------------------- */
+
+function renderMarkdown(md) {
+    const raw = String(md ?? "");
+    const escaped = escapeHtml(raw);
+
+    const lines = escaped.split(/\r?\n/);
+
+    const isList = (l) => l.trim().startsWith("- ") || l.trim().startsWith("* ");
+    const anyList = lines.some(isList);
+
+    let html = "";
+    if (anyList) {
+        const nonList = [];
+        const listItems = [];
+
+        for (const line of lines) {
+            if (isList(line)) {
+                listItems.push(line.trim().slice(2).trim());
+            } else if (line.trim() !== "") {
+                nonList.push(line);
+            }
+        }
+
+        if (nonList.length > 0) {
+            html += nonList.map(l => `<div>${inlineMd(l)}</div>`).join("");
+        }
+
+        if (listItems.length > 0) {
+            html += `<ul>${listItems.map(li => `<li>${inlineMd(li)}</li>`).join("")}</ul>`;
+        }
+    } else {
+        html = lines.map(l => `<div>${inlineMd(l)}</div>`).join("");
+    }
+
+    return html;
+}
+
+function inlineMd(text) {
+    let t = String(text ?? "");
+
+    t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, `<a href="$2" target="_blank" rel="noopener">$1</a>`);
+
+    return t;
+}
+
+/* -------------------------
+   Helpers
+-------------------------- */
 
 function repeatToLabel(type) {
     if (type === "none") return "Único";
@@ -1546,6 +1817,10 @@ function repeatToLabel(type) {
     return "Repite";
 }
 
+function isValidDateKey(x) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(x ?? "").trim());
+}
+
 function escapeHtml(str) {
     return String(str ?? "")
         .replaceAll("&", "&amp;")
@@ -1553,50 +1828,4 @@ function escapeHtml(str) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
-}
-
-function initLucideAndFavicon() {
-    if (!window.lucide || typeof window.lucide.createIcons !== "function") {
-        return;
-    }
-
-    // Renderiza todos los <i data-lucide="...">
-    window.lucide.createIcons();
-
-    // Construye favicon desde el SVG ya generado (mismo vector)
-    const sourceSvg = document.querySelector("#faviconSource svg");
-    if (!sourceSvg) {
-        return;
-    }
-
-    const iconInner = sourceSvg.innerHTML;
-
-    const faviconSvg = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <defs>
-                <linearGradient id="agx" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stop-color="#ea00d9"/>
-                    <stop offset="55%" stop-color="#0abdc6"/>
-                    <stop offset="100%" stop-color="#711c91"/>
-                </linearGradient>
-            </defs>
-
-            <rect x="0" y="0" width="24" height="24" rx="5" fill="url(#agx)"/>
-            <g stroke="#ebebff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
-                ${iconInner}
-            </g>
-        </svg>
-    `.trim();
-
-    const href = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(faviconSvg);
-
-    let link = document.querySelector('link[rel="icon"]');
-    if (!link) {
-        link = document.createElement("link");
-        link.rel = "icon";
-        document.head.appendChild(link);
-    }
-
-    link.type = "image/svg+xml";
-    link.href = href;
 }
